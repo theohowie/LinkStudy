@@ -88,6 +88,23 @@ enum StudyIntensity {
       );
 }
 
+/// 排课开始时间：从现在开始（今天剩余时段）或从明天开始。
+enum ScheduleStartMode {
+  now,
+  tomorrow;
+
+  String get name => switch (this) {
+        ScheduleStartMode.now => 'now',
+        ScheduleStartMode.tomorrow => 'tomorrow',
+      };
+
+  static ScheduleStartMode fromName(String? value) =>
+      ScheduleStartMode.values.firstWhere(
+        (m) => m.name == value,
+        orElse: () => ScheduleStartMode.now,
+      );
+}
+
 /// 本次排课设置（记住上次选择）。
 class AiSchedulePrefs {
   const AiSchedulePrefs({
@@ -95,18 +112,21 @@ class AiSchedulePrefs {
     this.days = 7,
     this.notes = '',
     this.timePreference = '',
+    this.startMode = ScheduleStartMode.now,
   });
 
   final StudyIntensity intensity;
   final int days; // 计划几天学完
   final String notes; // 备注：这段时间哪些时间已有安排
   final String timePreference; // 倾向的学习时间段；空 = 全天
+  final ScheduleStartMode startMode; // 从现在开始 / 从明天开始
 
   Map<String, dynamic> toJson() => {
         'intensity': intensity.name,
         'days': days,
         'notes': notes,
         'timePreference': timePreference,
+        'startMode': startMode.name,
       };
 
   factory AiSchedulePrefs.fromJson(Map<String, dynamic> json) => AiSchedulePrefs(
@@ -114,6 +134,7 @@ class AiSchedulePrefs {
         days: (json['days'] as num?)?.toInt() ?? 7,
         notes: json['notes'] as String? ?? '',
         timePreference: json['timePreference'] as String? ?? '',
+        startMode: ScheduleStartMode.fromName(json['startMode'] as String?),
       );
 }
 

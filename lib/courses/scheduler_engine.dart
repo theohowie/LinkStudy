@@ -47,6 +47,8 @@ typedef OrderedCourse = ({String courseId, int restAfterMinutes});
 /// [occupied] 已占用区间（weekday → 起止分钟列表，含锁定槽位）；[today] 今天（锚定排课日期）。
 /// [ordered] 可选：AI 给出的课程顺序与课后休息，提供时优先按此顺序落位（未覆盖的课程按默认排序补排）；
 /// [horizonDays] 排课窗口天数（默认 7；AI 排课按"计划天数"传入）。
+/// [startFromNow] 是否从当前时刻开始排（true=裁剪今天已过时段，避免排到过去；
+/// false=今天全天可用，配合"从明天开始"时将 [today] 传为明天）。
 SchedulingResult scheduleCourses({
   required List<LinkCourse> pending,
   required List<List<AvailabilitySlot>> availabilityByWeekday,
@@ -54,6 +56,7 @@ SchedulingResult scheduleCourses({
   required DateTime today,
   List<OrderedCourse>? ordered,
   int horizonDays = 7,
+  bool startFromNow = true,
 }) {
   if (pending.isEmpty) {
     return const SchedulingResult(placements: [], failures: []);
@@ -77,6 +80,7 @@ SchedulingResult scheduleCourses({
       availabilityByWeekday: availabilityByWeekday,
       today: today,
       horizonDays: horizonDays,
+      startFromNow: startFromNow,
     );
     if (placed == null) {
       failures.add((
@@ -139,16 +143,30 @@ SchedulePlacement? _placeCourse(
   required List<List<AvailabilitySlot>> availabilityByWeekday,
   required DateTime today,
   required int horizonDays,
+  required bool startFromNow,
 }) {
   final duration = course.durationMinutes;
   if (duration <= 0) return null;
 
   final todayWeekday = today.weekday;
+  final todayMinute = today.hour * 60 + today.minute;
   for (var offset = 0; offset < horizonDays; offset++) {
     final weekday = ((todayWeekday - 1 + offset) % 7) + 1;
-    final dayAvailability = availabilityByWeekday.length >= weekday
+    final rawAvailability = availabilityByWeekday.length >= weekday
         ? availabilityByWeekday[weekday - 1]
         : const <AvailabilitySlot>[];
+    // 从当前时刻开始排：裁剪今天（offset 0）已过的时间段，避免排到过去。
+    final dayAvailability = offset == 0 && startFromNow
+        ? [
+            for (final seg in rawAvailability)
+              if (seg.endMinute > todayMinute)
+                AvailabilitySlot(
+                  startMinute:
+                      seg.startMinute < todayMinute ? todayMinute : seg.startMinute,
+                  endMinute: seg.endMinute,
+                ),
+          ]
+        : rawAvailability;
     for (final seg in dayAvailability) {
       if (seg.endMinute - seg.startMinute < duration) continue;
       final candidate = _firstFit(

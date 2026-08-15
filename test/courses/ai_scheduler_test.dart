@@ -282,6 +282,18 @@ void main() {
   });
 
   group('AiScheduleSettings', () {
+    test('startMode 默认与序列化', () {
+      const prefs = AiSchedulePrefs();
+      expect(prefs.startMode, ScheduleStartMode.now);
+      final loaded = AiSchedulePrefs.fromJson(prefs.toJson());
+      expect(loaded.startMode, ScheduleStartMode.now);
+      const tomorrow = AiSchedulePrefs(startMode: ScheduleStartMode.tomorrow);
+      expect(
+        AiSchedulePrefs.fromJson(tomorrow.toJson()).startMode,
+        ScheduleStartMode.tomorrow,
+      );
+    });
+
     test('保存并读回上次排课设置', () async {
       final settings = AiScheduleSettings(secretStore: _FakeSecretStore());
       expect(await settings.loadSetupPrefs(), isNull);

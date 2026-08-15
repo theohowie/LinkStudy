@@ -198,6 +198,48 @@ void main() {
       expect(sevenDays.placements.single.weekday, 2);
     });
 
+    test('F4-10: 从现在开始——今天已过时段不排（顺延明天）', () {
+      // 周一 23:30，时段 19:00-22:00 已全部过去。
+      final lateToday = DateTime(2026, 1, 5, 23, 30);
+      final result = scheduleCourses(
+        pending: [course(id: 'a', duration: 40)],
+        availabilityByWeekday: availability,
+        occupied: const {},
+        today: lateToday,
+        startFromNow: true,
+      );
+      expect(result.placements, hasLength(1));
+      expect(result.placements.single.weekday, 2);
+      expect(result.placements.single.day, epochDayOf(DateTime(2026, 1, 6)));
+    });
+
+    test('F4-11: 从现在开始——今天部分时段已过则从当前时刻起排', () {
+      // 周一 20:00，时段 19:00-22:00 已过 1 小时。
+      final today = DateTime(2026, 1, 5, 20, 0);
+      final result = scheduleCourses(
+        pending: [course(id: 'a', duration: 40)],
+        availabilityByWeekday: availability,
+        occupied: const {},
+        today: today,
+        startFromNow: true,
+      );
+      expect(result.placements.single.start, 20 * 60);
+    });
+
+    test('F4-12: 从明天开始——今天不排，从明天起排', () {
+      // 周一 10:00，"今天"传为明天（周二），不裁剪时段。
+      final today = DateTime(2026, 1, 5, 10, 0);
+      final result = scheduleCourses(
+        pending: [course(id: 'a', duration: 40)],
+        availabilityByWeekday: availability,
+        occupied: const {},
+        today: today.add(const Duration(days: 1)),
+        startFromNow: false,
+      );
+      expect(result.placements, hasLength(1));
+      expect(result.placements.single.weekday, 2);
+    });
+
     test('空待安排返回空结果', () {
       final result = scheduleCourses(
         pending: const [],

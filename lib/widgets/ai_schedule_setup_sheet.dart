@@ -35,6 +35,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
 
   StudyIntensity _intensity = StudyIntensity.medium;
   int _days = 7;
+  ScheduleStartMode _startMode = ScheduleStartMode.now;
   final TextEditingController _notes = TextEditingController();
   final TextEditingController _timePreference = TextEditingController();
   bool _running = false;
@@ -60,6 +61,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       _days = saved.days.clamp(1, 14);
       _notes.text = saved.notes;
       _timePreference.text = saved.timePreference;
+      _startMode = saved.startMode;
     });
   }
 
@@ -97,6 +99,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       days: _days,
       notes: _notes.text.trim(),
       timePreference: _timePreference.text.trim(),
+      startMode: _startMode,
     );
     setState(() => _running = true);
     try {
@@ -131,6 +134,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
             ordered: ordered,
             days: prefs.days,
             availabilityByWeekday: availability,
+            startFromNow: prefs.startMode == ScheduleStartMode.now,
           );
           await _settings.saveSetupPrefs(prefs);
           final failNote = result.failures.isEmpty
@@ -228,6 +232,27 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
             onChanged: _running
                 ? null
                 : (v) => setState(() => _days = v.round()),
+          ),
+          const SizedBox(height: 16),
+          Text('开始时间', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SegmentedButton<ScheduleStartMode>(
+            segments: const [
+              ButtonSegment(
+                value: ScheduleStartMode.now,
+                icon: Icon(Icons.play_arrow_outlined),
+                label: Text('从现在开始'),
+              ),
+              ButtonSegment(
+                value: ScheduleStartMode.tomorrow,
+                icon: Icon(Icons.event_available_outlined),
+                label: Text('从明天开始'),
+              ),
+            ],
+            selected: {_startMode},
+            onSelectionChanged: _running
+                ? null
+                : (selection) => setState(() => _startMode = selection.first),
           ),
           const SizedBox(height: 8),
           Text(

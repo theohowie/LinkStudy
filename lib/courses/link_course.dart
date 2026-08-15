@@ -258,11 +258,13 @@ class LinkCourseStore extends ChangeNotifier {
   /// 按 AI 顺序排课：对 [courseIds]（本次勾选的课程）移除旧槽位，
   /// 按 [ordered]（可为空=默认贪心顺序）在 [days] 天窗口内落位；
   /// [availabilityByWeekday] 为每天可用时段（来自通用显示设置）。
+  /// [startFromNow] true=从现在开始（裁剪今天已过时段）；false=从明天开始（今天不排）。
   Future<SchedulingResult> scheduleWithOrder({
     required List<String> courseIds,
     required List<OrderedCourse> ordered,
     required int days,
     required List<List<AvailabilitySlot>> availabilityByWeekday,
+    bool startFromNow = true,
   }) async {
     final ids = courseIds.toSet();
     final pending = _courses.where((c) => ids.contains(c.id)).toList();
@@ -273,13 +275,17 @@ class LinkCourseStore extends ChangeNotifier {
       await _persist();
       return const SchedulingResult(placements: [], failures: []);
     }
+    final today = startFromNow
+        ? DateTime.now()
+        : DateTime.now().add(const Duration(days: 1));
     final result = scheduleCourses(
       pending: pending,
       availabilityByWeekday: availabilityByWeekday,
       occupied: _occupiedFromSlots(_slots),
-      today: DateTime.now(),
+      today: today,
       ordered: ordered.isEmpty ? null : ordered,
       horizonDays: days.clamp(1, 30),
+      startFromNow: startFromNow,
     );
     final added = [
       for (final p in result.placements)
