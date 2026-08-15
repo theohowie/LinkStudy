@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_locale.dart' as app_locale;
 import '../l10n/app_localizations.dart';
 import '../providers/timetable_provider.dart';
+import '../utils/time_utils.dart';
 import '../widgets/sked_dropdown_menu.dart';
 import '../widgets/settings_list.dart';
 
@@ -73,50 +74,60 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   ),
                 ),
               SettingsSectionHeader(title: l10n.generalTimeGridSection),
-              SettingsSliderTile(
+              _TimeSettingTile(
                 icon: Icons.access_time,
                 title: l10n.startHour,
-                value: provider.generalDayStartHour,
-                min: 0,
-                max: provider.generalDayEndHour - 1,
-                label:
-                    '${provider.generalDayStartHour.toString().padLeft(2, '0')}:00',
-                onChanged: (value) =>
-                    provider.updateGeneralDisplaySettings(dayStartHour: value),
-              ),
-              SettingsSliderTile(
-                icon: Icons.access_time,
-                title: l10n.endHour,
-                value: provider.generalDayEndHour,
-                min: provider.generalDayStartHour + 1,
-                max: 24,
-                label:
-                    '${provider.generalDayEndHour.toString().padLeft(2, '0')}:00',
-                onChanged: (value) =>
-                    provider.updateGeneralDisplaySettings(dayEndHour: value),
-              ),
-              SettingsSliderTile(
-                icon: Icons.free_breakfast_outlined,
-                title: l10n.lunchStartHour,
-                value: provider.generalLunchStartHour,
-                min: provider.generalDayStartHour,
-                max: provider.generalLunchEndHour - 1,
-                label:
-                    '${provider.generalLunchStartHour.toString().padLeft(2, '0')}:00',
-                onChanged: (value) => provider.updateGeneralDisplaySettings(
-                  lunchStartHour: value,
+                minute: provider.generalDayStartMinute,
+                onTap: () => _pickTime(
+                  context,
+                  provider,
+                  initialMinute: provider.generalDayStartMinute,
+                  onPicked: (minute) =>
+                      provider.updateGeneralDisplaySettings(
+                        dayStartMinute: minute,
+                      ),
                 ),
               ),
-              SettingsSliderTile(
+              _TimeSettingTile(
+                icon: Icons.access_time,
+                title: l10n.endHour,
+                minute: provider.generalDayEndMinute,
+                onTap: () => _pickTime(
+                  context,
+                  provider,
+                  initialMinute: provider.generalDayEndMinute,
+                  onPicked: (minute) =>
+                      provider.updateGeneralDisplaySettings(
+                        dayEndMinute: minute,
+                      ),
+                ),
+              ),
+              _TimeSettingTile(
+                icon: Icons.free_breakfast_outlined,
+                title: l10n.lunchStartHour,
+                minute: provider.generalLunchStartMinute,
+                onTap: () => _pickTime(
+                  context,
+                  provider,
+                  initialMinute: provider.generalLunchStartMinute,
+                  onPicked: (minute) =>
+                      provider.updateGeneralDisplaySettings(
+                        lunchStartMinute: minute,
+                      ),
+                ),
+              ),
+              _TimeSettingTile(
                 icon: Icons.free_breakfast_outlined,
                 title: l10n.lunchEndHour,
-                value: provider.generalLunchEndHour,
-                min: provider.generalLunchStartHour + 1,
-                max: provider.generalDayEndHour,
-                label:
-                    '${provider.generalLunchEndHour.toString().padLeft(2, '0')}:00',
-                onChanged: (value) => provider.updateGeneralDisplaySettings(
-                  lunchEndHour: value,
+                minute: provider.generalLunchEndMinute,
+                onTap: () => _pickTime(
+                  context,
+                  provider,
+                  initialMinute: provider.generalLunchEndMinute,
+                  onPicked: (minute) =>
+                      provider.updateGeneralDisplaySettings(
+                        lunchEndMinute: minute,
+                      ),
                 ),
               ),
               Padding(
@@ -164,4 +175,51 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
       },
     );
   }
+}
+
+/// 时间设置项：显示当前时间（HH:mm），点击弹出时间选择器（精确到分钟）。
+class _TimeSettingTile extends StatelessWidget {
+  const _TimeSettingTile({
+    required this.icon,
+    required this.title,
+    required this.minute,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final int minute;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsListTile(
+      leading: Icon(icon),
+      title: title,
+      subtitle: formatMinutes(minute),
+      trailing: const Icon(Icons.access_time),
+      onTap: onTap,
+    );
+  }
+}
+
+/// 弹出时间选择器，选择结果以分钟回调。
+Future<void> _pickTime(
+  BuildContext context,
+  TimetableProvider provider, {
+  required int initialMinute,
+  required ValueChanged<int> onPicked,
+}) async {
+  final picked = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay(
+      hour: initialMinute ~/ 60,
+      minute: initialMinute % 60,
+    ),
+    helpText: '选择时间',
+    cancelText: '取消',
+    confirmText: '确定',
+  );
+  if (picked == null) return;
+  onPicked(picked.hour * 60 + picked.minute);
 }

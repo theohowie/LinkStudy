@@ -99,10 +99,10 @@ void main() {
       final repo = AppRepository(storage: storage);
       await repo.load();
 
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 5), flush: true);
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 5 * 60), flush: true);
 
-      expect(repo.current!.generalMode.dayStartHour, equals(5));
-      expect(storage.lastSaved!.generalMode.dayStartHour, equals(5));
+      expect(repo.current!.generalMode.dayStartMinute, equals(5 * 60));
+      expect(storage.lastSaved!.generalMode.dayStartMinute, equals(5 * 60));
     });
 
     test('updateSettings applies pure-function patch to AppData', () async {
@@ -167,13 +167,13 @@ void main() {
 
       // Fire two updates without flush; the second depends on the first
       // through the chained pending write.
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 5));
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 7));
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 5 * 60));
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 7 * 60));
       await repo.flush();
 
       expect(storage.writeLog.length, equals(2));
-      expect(storage.writeLog[0].generalMode.dayStartHour, equals(5));
-      expect(storage.writeLog[1].generalMode.dayStartHour, equals(7));
+      expect(storage.writeLog[0].generalMode.dayStartMinute, equals(5 * 60));
+      expect(storage.writeLog[1].generalMode.dayStartMinute, equals(7 * 60));
     });
 
     test('flush awaits the most recent pending save', () async {
@@ -188,7 +188,7 @@ void main() {
       final repo = AppRepository(storage: storage);
       await repo.load();
 
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 9));
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 9 * 60));
 
       var flushDone = false;
       final flushFuture = repo.flush().then((_) => flushDone = true);
@@ -201,7 +201,7 @@ void main() {
       await flushFuture;
 
       expect(flushDone, isTrue);
-      expect(storage.lastSaved!.generalMode.dayStartHour, equals(9));
+      expect(storage.lastSaved!.generalMode.dayStartMinute, equals(9 * 60));
     });
 
     test('save() replaces current and persists the snapshot', () async {
@@ -249,12 +249,12 @@ void main() {
       final repo = AppRepository(storage: storage);
       await repo.load();
 
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 6));
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 6 * 60));
 
       await expectLater(repo.flush(), throwsException);
       expect(storage.lastSaved, isNull);
       expect(storage.saveCount, equals(1));
-      expect(repo.current!.generalMode.dayStartHour, equals(6));
+      expect(repo.current!.generalMode.dayStartMinute, equals(6 * 60));
     });
 
     test('a failed pending write does not block later writes', () async {
@@ -267,14 +267,14 @@ void main() {
       final repo = AppRepository(storage: storage);
       await repo.load();
 
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 6));
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 6 * 60));
       await expectLater(repo.flush(), throwsException);
 
-      await repo.updateGeneral((g) => g.copyWith(dayStartHour: 8), flush: true);
+      await repo.updateGeneral((g) => g.copyWith(dayStartMinute: 8 * 60), flush: true);
 
       expect(storage.saveCount, equals(2));
       expect(storage.writeLog.length, equals(1));
-      expect(storage.lastSaved!.generalMode.dayStartHour, equals(8));
+      expect(storage.lastSaved!.generalMode.dayStartMinute, equals(8 * 60));
     });
 
     test('older flushed write failure does not roll back newer save', () async {

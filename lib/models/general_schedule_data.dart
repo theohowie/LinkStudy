@@ -141,10 +141,10 @@ class GeneralScheduleData {
     this.defaultView = generalViewWeek,
     this.showWeekends = true,
     this.showLunarCalendar = true,
-    this.dayStartHour = 6,
-    this.dayEndHour = 23,
-    this.lunchStartHour = 12,
-    this.lunchEndHour = 13,
+    this.dayStartMinute = 6 * 60,
+    this.dayEndMinute = 23 * 60,
+    this.lunchStartMinute = 12 * 60,
+    this.lunchEndMinute = 13 * 60,
     this.timeGridMinutes = 60,
     this.closeEventPopupOnOutsideTap = true,
     this.themeMode = defaultThemeMode,
@@ -160,10 +160,10 @@ class GeneralScheduleData {
   final String defaultView;
   final bool showWeekends;
   final bool showLunarCalendar;
-  final int dayStartHour;
-  final int dayEndHour;
-  final int lunchStartHour;
-  final int lunchEndHour;
+  final int dayStartMinute;
+  final int dayEndMinute;
+  final int lunchStartMinute;
+  final int lunchEndMinute;
   final int timeGridMinutes;
   final bool closeEventPopupOnOutsideTap;
   final String themeMode;
@@ -205,10 +205,10 @@ class GeneralScheduleData {
     'defaultView': normalizeGeneralView(defaultView),
     'showWeekends': showWeekends,
     'showLunarCalendar': showLunarCalendar,
-    'dayStartHour': dayStartHour,
-    'dayEndHour': dayEndHour,
-    'lunchStartHour': lunchStartHour,
-    'lunchEndHour': lunchEndHour,
+    'dayStartMinute': dayStartMinute,
+    'dayEndMinute': dayEndMinute,
+    'lunchStartMinute': lunchStartMinute,
+    'lunchEndMinute': lunchEndMinute,
     'timeGridMinutes': timeGridMinutes,
     'closeEventPopupOnOutsideTap': closeEventPopupOnOutsideTap,
     'themeMode': normalizeThemeMode(themeMode),
@@ -266,12 +266,30 @@ class GeneralScheduleData {
       ),
       showWeekends: _boolValue(json['showWeekends']) ?? true,
       showLunarCalendar: _boolValue(json['showLunarCalendar']) ?? true,
-      dayStartHour: (_intValue(json['dayStartHour']) ?? 6).clamp(0, 23).toInt(),
-      dayEndHour: (_intValue(json['dayEndHour']) ?? 23).clamp(1, 24).toInt(),
-      lunchStartHour:
-          (_intValue(json['lunchStartHour']) ?? 12).clamp(0, 23).toInt(),
-      lunchEndHour:
-          (_intValue(json['lunchEndHour']) ?? 13).clamp(1, 24).toInt(),
+      dayStartMinute: _readDayBoundaryMinute(
+        json,
+        minuteKey: 'dayStartMinute',
+        hourKey: 'dayStartHour',
+        fallback: 6 * 60,
+      ),
+      dayEndMinute: _readDayBoundaryMinute(
+        json,
+        minuteKey: 'dayEndMinute',
+        hourKey: 'dayEndHour',
+        fallback: 23 * 60,
+      ),
+      lunchStartMinute: _readDayBoundaryMinute(
+        json,
+        minuteKey: 'lunchStartMinute',
+        hourKey: 'lunchStartHour',
+        fallback: 12 * 60,
+      ),
+      lunchEndMinute: _readDayBoundaryMinute(
+        json,
+        minuteKey: 'lunchEndMinute',
+        hourKey: 'lunchEndHour',
+        fallback: 13 * 60,
+      ),
       timeGridMinutes: _normalizeGridMinutes(
         _intValue(json['timeGridMinutes']),
       ),
@@ -311,10 +329,10 @@ class GeneralScheduleData {
     String? defaultView,
     bool? showWeekends,
     bool? showLunarCalendar,
-    int? dayStartHour,
-    int? dayEndHour,
-    int? lunchStartHour,
-    int? lunchEndHour,
+    int? dayStartMinute,
+    int? dayEndMinute,
+    int? lunchStartMinute,
+    int? lunchEndMinute,
     int? timeGridMinutes,
     bool? closeEventPopupOnOutsideTap,
     String? themeMode,
@@ -332,10 +350,10 @@ class GeneralScheduleData {
       defaultView: normalizeGeneralView(defaultView ?? this.defaultView),
       showWeekends: showWeekends ?? this.showWeekends,
       showLunarCalendar: showLunarCalendar ?? this.showLunarCalendar,
-      dayStartHour: dayStartHour ?? this.dayStartHour,
-      dayEndHour: dayEndHour ?? this.dayEndHour,
-      lunchStartHour: lunchStartHour ?? this.lunchStartHour,
-      lunchEndHour: lunchEndHour ?? this.lunchEndHour,
+      dayStartMinute: dayStartMinute ?? this.dayStartMinute,
+      dayEndMinute: dayEndMinute ?? this.dayEndMinute,
+      lunchStartMinute: lunchStartMinute ?? this.lunchStartMinute,
+      lunchEndMinute: lunchEndMinute ?? this.lunchEndMinute,
       timeGridMinutes: timeGridMinutes ?? this.timeGridMinutes,
       closeEventPopupOnOutsideTap:
           closeEventPopupOnOutsideTap ?? this.closeEventPopupOnOutsideTap,
@@ -414,10 +432,10 @@ class GeneralScheduleData {
     final activeId = normalizedSchedules.any((s) => s.id == activeScheduleId)
         ? activeScheduleId
         : normalizedSchedules.first.id;
-    final start = dayStartHour.clamp(0, 23).toInt();
-    final end = dayEndHour.clamp(start + 1, 24).toInt();
-    final lunchStart = lunchStartHour.clamp(start, end - 1).toInt();
-    final lunchEnd = lunchEndHour.clamp(lunchStart + 1, end).toInt();
+    final start = dayStartMinute.clamp(0, 24 * 60 - 1).toInt();
+    final end = dayEndMinute.clamp(start + 1, 24 * 60).toInt();
+    final lunchStart = lunchStartMinute.clamp(start, end - 1).toInt();
+    final lunchEnd = lunchEndMinute.clamp(lunchStart + 1, end).toInt();
     final acknowledgementsByKey = <String, GeneralReminderAcknowledgement>{};
     for (final acknowledgement in reminderAcknowledgements) {
       final normalized = acknowledgement.normalized();
@@ -441,10 +459,10 @@ class GeneralScheduleData {
       defaultView: normalizeGeneralView(defaultView),
       showWeekends: showWeekends,
       showLunarCalendar: showLunarCalendar,
-      dayStartHour: start,
-      dayEndHour: end,
-      lunchStartHour: lunchStart,
-      lunchEndHour: lunchEnd,
+      dayStartMinute: start,
+      dayEndMinute: end,
+      lunchStartMinute: lunchStart,
+      lunchEndMinute: lunchEnd,
       timeGridMinutes: _normalizeGridMinutes(timeGridMinutes),
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
       themeMode: normalizeThemeMode(themeMode),
@@ -489,6 +507,20 @@ int _normalizeGridMinutes(int? value) {
     default:
       return 60;
   }
+}
+
+/// 读取日时间边界（分钟级）：优先新键（分钟），兼容旧键（小时 × 60）。
+int _readDayBoundaryMinute(
+  Map<String, dynamic> json, {
+  required String minuteKey,
+  required String hourKey,
+  required int fallback,
+}) {
+  final minutes = _intValue(json[minuteKey]);
+  if (minutes != null) return minutes;
+  final hours = _intValue(json[hourKey]);
+  if (hours != null) return hours * 60;
+  return fallback;
 }
 
 String _normalizeUniqueId(

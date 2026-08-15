@@ -3,10 +3,10 @@ import 'package:linkstudy/courses/link_course.dart';
 
 void main() {
   final availability = availabilityFromDayWindow(
-    startHour: 8,
-    lunchStartHour: 12,
-    lunchEndHour: 13,
-    endHour: 22,
+    startMinute: 8 * 60,
+    lunchStartMinute: 12 * 60,
+    lunchEndMinute: 13 * 60,
+    endMinute: 22 * 60,
   );
 
   group('LinkCourseStore 入池与排课', () {

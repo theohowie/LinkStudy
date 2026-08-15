@@ -66,10 +66,10 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   String get _windowDescription {
     final provider = widget.provider;
     final availability = availabilityFromDayWindow(
-      startHour: provider.generalDayStartHour,
-      lunchStartHour: provider.generalLunchStartHour,
-      lunchEndHour: provider.generalLunchEndHour,
-      endHour: provider.generalDayEndHour,
+      startMinute: provider.generalDayStartMinute,
+      lunchStartMinute: provider.generalLunchStartMinute,
+      lunchEndMinute: provider.generalLunchEndMinute,
+      endMinute: provider.generalDayEndMinute,
     );
     final slots = availability.isEmpty ? const <AvailabilitySlot>[] : availability.first;
     return slots
@@ -102,10 +102,10 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
     try {
       final provider = widget.provider;
       final availability = availabilityFromDayWindow(
-        startHour: provider.generalDayStartHour,
-        lunchStartHour: provider.generalLunchStartHour,
-        lunchEndHour: provider.generalLunchEndHour,
-        endHour: provider.generalDayEndHour,
+        startMinute: provider.generalDayStartMinute,
+        lunchStartMinute: provider.generalLunchStartMinute,
+        lunchEndMinute: provider.generalLunchEndMinute,
+        endMinute: provider.generalDayEndMinute,
       );
       final config = await _settings.loadConfig(
         windowDescription: _windowDescription,
@@ -139,17 +139,10 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
           _showSnack('AI 排课完成：${result.placements.length} 门已安排$failNote');
           if (mounted) Navigator.of(context).pop();
         case AiScheduleOutcomeError(:final error):
-          final result = await widget.store.scheduleWithOrder(
-            courseIds: widget.courseIds,
-            ordered: const [],
-            days: prefs.days,
-            availabilityByWeekday: availability,
-          );
+          // 不自动回退排课：课程保留在未排课池中，用户处理（如配置/更换模型）后可重新 AI 排课。
           await _settings.saveSetupPrefs(prefs);
-          _showSnack(
-            'AI 排课失败：${error.message}（已按本地算法排课 ${result.placements.length} 门）',
-          );
-          if (mounted) Navigator.of(context).pop();
+          _showSnack('AI 排课失败：${error.message}（课程仍留在未排课池，可修改后重试）');
+          if (mounted) setState(() => _running = false);
       }
     } catch (e) {
       _showSnack('排课出错：$e');

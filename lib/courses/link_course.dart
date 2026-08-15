@@ -40,19 +40,19 @@ DateTime localDateFromEpochDay(int day) {
   return DateTime(utc.year, utc.month, utc.day);
 }
 
-/// 从通用显示设置（开始/午休/结束时间，小时级）构建每天的学习可用时段（7 天相同）。
+/// 从通用显示设置（开始/午休/结束时间，分钟级）构建每天的学习可用时段（7 天相同）。
 /// 时段 = [开始, 午休开始) + [午休结束, 结束)；午休无效时退化为 [开始, 结束)；
 /// 全部无效时回退默认 19:00-22:00。
 List<List<AvailabilitySlot>> availabilityFromDayWindow({
-  required int startHour,
-  required int lunchStartHour,
-  required int lunchEndHour,
-  required int endHour,
+  required int startMinute,
+  required int lunchStartMinute,
+  required int lunchEndMinute,
+  required int endMinute,
 }) {
-  final morningStart = startHour.clamp(0, 23) * 60;
-  final lunchStart = lunchStartHour.clamp(0, 24) * 60;
-  final lunchEnd = lunchEndHour.clamp(0, 24) * 60;
-  final eveningEnd = endHour.clamp(1, 24) * 60;
+  final morningStart = startMinute.clamp(0, 24 * 60 - 1);
+  final lunchStart = lunchStartMinute.clamp(0, 24 * 60);
+  final lunchEnd = lunchEndMinute.clamp(0, 24 * 60);
+  final eveningEnd = endMinute.clamp(1, 24 * 60);
 
   final slots = <AvailabilitySlot>[];
   if (lunchStart > morningStart) {

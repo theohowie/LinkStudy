@@ -3096,13 +3096,13 @@ abstract class AppLocalizations {
   /// No description provided for @startHour.
   ///
   /// In en, this message translates to:
-  /// **'Start hour'**
+  /// **'Start time'**
   String get startHour;
 
   /// No description provided for @endHour.
   ///
   /// In en, this message translates to:
-  /// **'End hour'**
+  /// **'End time'**
   String get endHour;
 
   /// No description provided for @lunchStartHour.

@@ -171,8 +171,8 @@ class _WeekTimelinePage extends StatelessWidget {
       days: days,
       selectedDate: selectedDate,
       occurrences: occurrences,
-      startHour: provider.generalDayStartHour,
-      endHour: provider.generalDayEndHour,
+      startMinute: provider.generalDayStartMinute,
+      endMinute: provider.generalDayEndMinute,
       gridMinutes: provider.generalTimeGridMinutes,
       showHeader: true,
       onEmptySlotTap: onEmptySlotTap,
@@ -478,8 +478,8 @@ class _DayTimelinePage extends StatelessWidget {
       days: [day],
       selectedDate: day,
       occurrences: occurrences,
-      startHour: provider.generalDayStartHour,
-      endHour: provider.generalDayEndHour,
+      startMinute: provider.generalDayStartMinute,
+      endMinute: provider.generalDayEndMinute,
       gridMinutes: provider.generalTimeGridMinutes,
       showHeader: false,
       onEmptySlotTap: onEmptySlotTap,
@@ -737,8 +737,8 @@ class _CalendarTimeline extends StatelessWidget {
     required this.days,
     required this.selectedDate,
     required this.occurrences,
-    required this.startHour,
-    required this.endHour,
+    required this.startMinute,
+    required this.endMinute,
     required this.gridMinutes,
     required this.showHeader,
     required this.onEmptySlotTap,
@@ -754,8 +754,8 @@ class _CalendarTimeline extends StatelessWidget {
   final List<DateTime> days;
   final DateTime selectedDate;
   final List<GeneralEventOccurrence> occurrences;
-  final int startHour;
-  final int endHour;
+  final int startMinute;
+  final int endMinute;
   final int gridMinutes;
   final bool showHeader;
   final ValueChanged<DateTime> onEmptySlotTap;
@@ -768,9 +768,10 @@ class _CalendarTimeline extends StatelessWidget {
     if (days.isEmpty) {
       return const SizedBox.shrink();
     }
-    final startMinutes = startHour * 60;
-    final endMinutes = endHour * 60;
-    final gridHeight = math.max(1, endHour - startHour) * _hourHeight;
+    final startMinutes = startMinute;
+    final endMinutes = endMinute;
+    final gridHeight =
+        math.max(1, endMinute - startMinute) * (_hourHeight / 60);
     final contentHeight = gridHeight + _timeLabelVerticalPadding * 2;
     final minuteHeight = _hourHeight / 60;
     final allDayOccurrencesByDay = [
@@ -855,8 +856,8 @@ class _CalendarTimeline extends StatelessWidget {
                           timeColumnWidth: metrics.timeColumnWidth,
                           dayWidth: metrics.dayWidth,
                           dayCount: days.length,
-                          startHour: startHour,
-                          endHour: endHour,
+                          startMinute: startMinute,
+                          endMinute: endMinute,
                           gridMinutes: gridMinutes,
                           hourHeight: _hourHeight,
                           topOffset: _timeLabelVerticalPadding,

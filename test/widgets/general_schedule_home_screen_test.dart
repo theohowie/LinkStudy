@@ -440,8 +440,8 @@ void main() {
           schedules: [calendar],
           selectedDateIso: '2026-07-20',
           defaultView: generalViewWeek,
-          dayStartHour: 6,
-          dayEndHour: 23,
+          dayStartMinute: 6 * 60,
+          dayEndMinute: 23 * 60,
         ),
       ),
     );

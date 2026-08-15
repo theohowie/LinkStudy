@@ -120,8 +120,8 @@ class _GridBackground extends StatelessWidget {
     required this.timeColumnWidth,
     required this.dayWidth,
     required this.dayCount,
-    required this.startHour,
-    required this.endHour,
+    required this.startMinute,
+    required this.endMinute,
     required this.gridMinutes,
     required this.hourHeight,
     required this.topOffset,
@@ -130,8 +130,8 @@ class _GridBackground extends StatelessWidget {
   final double timeColumnWidth;
   final double dayWidth;
   final int dayCount;
-  final int startHour;
-  final int endHour;
+  final int startMinute;
+  final int endMinute;
   final int gridMinutes;
   final double hourHeight;
   final double topOffset;
@@ -144,6 +144,9 @@ class _GridBackground extends StatelessWidget {
     final minorColor = colors.outlineVariant.withValues(alpha: 0.28);
     final timeLabelColor = colors.onSurfaceVariant;
     final gridStep = gridMinutes.clamp(15, 60).toInt();
+    final minuteHeight = hourHeight / 60;
+    final firstHour = (startMinute / 60).ceil();
+    final lastHour = (endMinute / 60).floor();
     return Stack(
       children: [
         Positioned.fill(
@@ -156,17 +159,17 @@ class _GridBackground extends StatelessWidget {
             ),
           ),
         ),
-        for (var hour = startHour; hour <= endHour; hour++)
+        for (var hour = firstHour; hour <= lastHour; hour++)
           Positioned(
             left: timeColumnWidth,
             right: 0,
-            top: topOffset + (hour - startHour) * hourHeight,
+            top: topOffset + (hour * 60 - startMinute) * minuteHeight,
             child: Divider(height: 1, color: lineColor),
           ),
-        for (var hour = startHour; hour <= endHour; hour++)
+        for (var hour = firstHour; hour <= lastHour; hour++)
           Positioned(
             left: 0,
-            top: topOffset + (hour - startHour) * hourHeight - 9,
+            top: topOffset + (hour * 60 - startMinute) * minuteHeight - 9,
             width: timeColumnWidth,
             height: 18,
             child: Padding(
@@ -187,16 +190,12 @@ class _GridBackground extends StatelessWidget {
               ),
             ),
           ),
-        for (
-          var minute = gridStep;
-          minute < (endHour - startHour) * 60;
-          minute += gridStep
-        )
+        for (var minute = startMinute; minute < endMinute; minute += gridStep)
           if (minute % 60 != 0)
             Positioned(
               left: timeColumnWidth,
               right: 0,
-              top: topOffset + minute / 60 * hourHeight,
+              top: topOffset + (minute - startMinute) * minuteHeight,
               child: Divider(height: 1, color: minorColor),
             ),
         for (var day = 0; day <= dayCount; day++)

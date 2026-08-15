@@ -1651,10 +1651,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showWeekends => 'Show weekends';
 
   @override
-  String get startHour => 'Start hour';
+  String get startHour => 'Start time';
 
   @override
-  String get endHour => 'End hour';
+  String get endHour => 'End time';
 
   @override
   String get lunchStartHour => 'Lunch break starts';

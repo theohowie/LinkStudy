@@ -1582,10 +1582,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showWeekends => '显示周末';
 
   @override
-  String get startHour => '开始小时';
+  String get startHour => '开始时间';
 
   @override
-  String get endHour => '结束小时';
+  String get endHour => '结束时间';
 
   @override
   String get lunchStartHour => '午休开始';
@@ -3319,10 +3319,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get showWeekends => '顯示週末';
 
   @override
-  String get startHour => '開始小時';
+  String get startHour => '開始時間';
 
   @override
-  String get endHour => '結束小時';
+  String get endHour => '結束時間';
 
   @override
   String get lunchStartHour => '午休開始';

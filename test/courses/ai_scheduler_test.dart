@@ -288,10 +288,10 @@ void main() {
   group('availabilityFromDayWindow', () {
     test('正常午休拆分为两个时段', () {
       final days = availabilityFromDayWindow(
-        startHour: 8,
-        lunchStartHour: 12,
-        lunchEndHour: 13,
-        endHour: 22,
+        startMinute: 8 * 60,
+        lunchStartMinute: 12 * 60,
+        lunchEndMinute: 13 * 60,
+        endMinute: 22 * 60,
       );
       expect(days, hasLength(7));
       final slots = days.first;
@@ -304,15 +304,29 @@ void main() {
 
     test('午休无效时退化为单时段', () {
       final days = availabilityFromDayWindow(
-        startHour: 8,
-        lunchStartHour: 8,
-        lunchEndHour: 8,
-        endHour: 22,
+        startMinute: 8 * 60,
+        lunchStartMinute: 8 * 60,
+        lunchEndMinute: 8 * 60,
+        endMinute: 22 * 60,
       );
       final slots = days.first;
       expect(slots, hasLength(1));
       expect(slots.single.startMinute, 8 * 60);
       expect(slots.single.endMinute, 22 * 60);
+    });
+
+    test('支持非整点时间', () {
+      final days = availabilityFromDayWindow(
+        startMinute: 8 * 60 + 30,
+        lunchStartMinute: 12 * 60 + 15,
+        lunchEndMinute: 13 * 60 + 45,
+        endMinute: 22 * 60 + 10,
+      );
+      final slots = days.first;
+      expect(slots[0].startMinute, 8 * 60 + 30);
+      expect(slots[0].endMinute, 12 * 60 + 15);
+      expect(slots[1].startMinute, 13 * 60 + 45);
+      expect(slots[1].endMinute, 22 * 60 + 10);
     });
   });
 }
