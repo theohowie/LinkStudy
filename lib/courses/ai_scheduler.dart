@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show HandshakeException;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -53,7 +54,7 @@ class AiScheduleConfig {
     required this.apiKey,
     required this.model,
     this.windowDescription = '',
-    this.timeout = const Duration(seconds: 15),
+    this.timeout = const Duration(seconds: 30),
   });
 
   final AiProvider provider;
@@ -237,7 +238,16 @@ class AiScheduler {
           type: AiScheduleErrorType.network,
           message:
               'AI 请求超时（${config.timeout.inSeconds} 秒）：${config.baseUrl.trim()} 无响应。'
-              '请检查网络；使用 OpenAI 需确保设备可直连 api.openai.com',
+              '请检查设备网络（能否用浏览器打开该地址）；使用 OpenAI 需确保设备可直连 api.openai.com',
+        ),
+      );
+    } on HandshakeException {
+      return AiScheduleOutcomeError(
+        AiScheduleError(
+          type: AiScheduleErrorType.network,
+          message:
+              'TLS 握手失败（${config.baseUrl.trim()}）。请检查设备系统时间是否正确、'
+              '是否开启了 VPN/代理或网络被拦截',
         ),
       );
     } on http.ClientException {
