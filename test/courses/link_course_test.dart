@@ -88,6 +88,21 @@ void main() {
       expect(store.slots, hasLength(1));
     });
 
+    test('removeSlotForCourse 移除槽位（网格删除联动，课程回池）', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final course = await store.addCourse(
+        url: 'https://example.com/slot-remove',
+        title: '联动课程',
+        durationMinutes: 40,
+      );
+      await store.schedulePending();
+      expect(store.slots, hasLength(1));
+      await store.removeSlotForCourse(course.id);
+      expect(store.slots, isEmpty);
+      expect(store.pendingCount, 1);
+    });
+
     test('删除课程同时移除其槽位', () async {
       final store = LinkCourseStore.instance;
       store.debugClear();

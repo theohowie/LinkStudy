@@ -357,6 +357,16 @@ class LinkCourseStore extends ChangeNotifier {
     await _persist();
   }
 
+  /// 移除课程的槽位（网格删除联动：删除"LinkStudy 课表"里的课程日程时，
+  /// 课程回到未排课池，网格同步不再重建该事件）。
+  Future<void> removeSlotForCourse(String courseId) async {
+    final next = _slots.where((s) => s.courseId != courseId).toList();
+    if (next.length == _slots.length) return;
+    _slots = next;
+    notifyListeners();
+    await _persist();
+  }
+
   LinkCourse? courseById(String id) =>
       _courses.where((c) => c.id == id).firstOrNull;
 

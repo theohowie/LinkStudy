@@ -1,4 +1,5 @@
 import '../models/general_models.dart';
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
@@ -330,6 +331,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
       if (result == null || !mounted || !context.mounted) return;
 
       if (result.delete && event != null) {
+        _removeLinkCourseSlotForGridEvent(event.id);
         try {
           await provider.deleteGeneralEvent(event.id);
         } catch (_) {
@@ -408,6 +410,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
             }
           },
           onDeleteThis: () async {
+            _removeLinkCourseSlotForGridEvent(occurrence.event.id);
             await provider.deleteGeneralOccurrence(occurrence);
             if (sheetContext.mounted) Navigator.of(sheetContext).pop();
           },
@@ -418,6 +421,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
                 }
               : null,
           onDeleteAll: () async {
+            _removeLinkCourseSlotForGridEvent(occurrence.event.id);
             await provider.deleteGeneralEvent(occurrence.event.id);
             if (sheetContext.mounted) Navigator.of(sheetContext).pop();
           },
@@ -505,6 +509,15 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     } finally {
       _setUiBusyFlag(() => _settingsPageOpen = false);
     }
+  }
+
+  /// 网格删除联动：删除"LinkStudy 课表"里的课程日程时，
+  /// 同步移除对应课程槽位（课程回到未排课池），避免 sync 重建已删除的事件。
+  void _removeLinkCourseSlotForGridEvent(String eventId) {
+    if (!eventId.startsWith('ls_')) return;
+    unawaited(
+      LinkCourseStore.instance.removeSlotForCourse(eventId.substring(3)),
+    );
   }
 
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。

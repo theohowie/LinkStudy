@@ -238,8 +238,8 @@ class OverlayService : Service() {
             horizontalMargin = dp(12).toFloat()
         }
 
-        panel.onSave = { url, title, duration ->
-            OverlayChannel.sendDraftSaved(url, title, duration)
+        panel.onSave = { url, title, duration, priority, deadlineDay ->
+            OverlayChannel.sendDraftSaved(url, title, duration, priority, deadlineDay)
             hidePanel()
         }
         panel.onCancel = { hidePanel() }

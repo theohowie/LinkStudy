@@ -101,13 +101,15 @@ object OverlayChannel {
         sink?.success(mapOf("type" to "onUrlsCaptured", "urls" to urls, "source" to source))
     }
 
-    /** 悬浮面板保存课程草稿（url/title/duration）。 */
-    fun sendDraftSaved(url: String, title: String, durationMinutes: Int) {
+    /** 悬浮面板保存课程草稿（url/title/duration/priority/deadlineDay）。 */
+    fun sendDraftSaved(url: String, title: String, durationMinutes: Int, priority: String, deadlineDay: Long?) {
         sink?.success(mapOf(
             "type" to "onDraftSaved",
             "url" to url,
             "title" to title,
             "durationMinutes" to durationMinutes,
+            "priority" to priority,
+            "deadlineDay" to deadlineDay,
         ))
     }
 

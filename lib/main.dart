@@ -59,9 +59,21 @@ Future<void> main() async {
         final url = raw['url'] as String? ?? '';
         final title = raw['title'] as String? ?? '';
         final duration = (raw['durationMinutes'] as num?)?.toInt() ?? 0;
+        final priorityName = raw['priority'] as String? ?? '';
+        final deadlineDay = (raw['deadlineDay'] as num?)?.toInt();
+        final priority = CoursePriority.values.firstWhere(
+          (p) => p.name == priorityName,
+          orElse: () => CoursePriority.medium,
+        );
         debugPrint('[linkstudy] overlay draft: $url | $title | ${duration}min');
         final result = await ingestService.ingest(
-          CourseDraft(url: url, title: title, durationMinutes: duration),
+          CourseDraft(
+            url: url,
+            title: title,
+            durationMinutes: duration,
+            deadlineDay: deadlineDay,
+            priority: priority,
+          ),
         );
         if (result.success) {
           final c = result.course!;

@@ -37,10 +37,14 @@ class PanelColors(map: Map<*, *>?) {
  */
 class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(context) {
 
-    var onSave: ((String, String, Int) -> Unit)? = null
+    /** 保存回调：url / title / durationMinutes / priority(high|medium|low) / deadlineDay(epochDay，可空)。 */
+    var onSave: ((String, String, Int, String, Long?) -> Unit)? = null
     var onCancel: (() -> Unit)? = null
 
     private var theme = PanelColors(colors)
+
+    private var priority = "medium"
+    private var deadlineDay: Long? = null
 
     private val urlInput = EditText(context)
     private val titleInput = EditText(context)
@@ -48,6 +52,8 @@ class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(cont
     private val urlUnderline = View(context)
     private val titleUnderline = View(context)
     private val durationUnderline = View(context)
+    private val priorityButton = Button(context)
+    private val deadlineButton = Button(context)
     private val pasteButton = Button(context)
     private val saveButton = Button(context)
     private val cancelButton = Button(context)
@@ -80,6 +86,21 @@ class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(cont
             buildInputRow(durationInput, durationUnderline, "时长（分钟）", InputType.TYPE_CLASS_NUMBER),
             inputRowParams(),
         )
+        addView(
+            buildInlineButton(priorityButton, "优先级：中") {
+                priority = when (priority) {
+                    "high" -> "medium"
+                    "medium" -> "low"
+                    else -> "high"
+                }
+                priorityButton.text = "优先级：${priorityLabel(priority)}"
+            },
+            inputRowParams(),
+        )
+        addView(
+            buildInlineButton(deadlineButton, "截止日期：无") { pickDeadline() },
+            inputRowParams(),
+        )
 
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
         pasteButton.apply {
@@ -107,6 +128,41 @@ class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(cont
             topMargin = dp(14)
             gravity = Gravity.END
         })
+    }
+
+    private fun buildInlineButton(button: Button, text: String, onClick: () -> Unit): Button {
+        return button.apply {
+            this.text = text
+            background = null
+            setTextColor(theme.primary)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun priorityLabel(p: String): String = when (p) {
+        "high" -> "高"
+        "medium" -> "中"
+        else -> "低"
+    }
+
+    private fun pickDeadline() {
+        val now = java.util.Calendar.getInstance()
+        android.app.DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                    clear()
+                    set(y, m, d)
+                }
+                deadlineDay = cal.timeInMillis / 86400000L
+                deadlineButton.text = "截止日期：$y-${(m + 1).toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}"
+            },
+            now.get(java.util.Calendar.YEAR),
+            now.get(java.util.Calendar.MONTH),
+            now.get(java.util.Calendar.DAY_OF_MONTH),
+        ).show()
     }
 
     private fun buildInputRow(
@@ -155,6 +211,8 @@ class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(cont
         urlUnderline.setBackgroundColor(if (urlInput.hasFocus()) theme.primary else theme.outline)
         titleUnderline.setBackgroundColor(if (titleInput.hasFocus()) theme.primary else theme.outline)
         durationUnderline.setBackgroundColor(if (durationInput.hasFocus()) theme.primary else theme.outline)
+        priorityButton.setTextColor(theme.primary)
+        deadlineButton.setTextColor(theme.primary)
         pasteButton.setTextColor(theme.primary)
         cancelButton.setTextColor(theme.onSurfaceVariant)
         saveButton.setTextColor(theme.onPrimary)
@@ -211,7 +269,7 @@ class OverlayPanelView(context: Context, colors: Map<*, *>?) : LinearLayout(cont
             Toast.makeText(context, "时长需为 1-600 的整数（分钟）", Toast.LENGTH_SHORT).show()
             return
         }
-        onSave?.invoke(url, title, duration)
+        onSave?.invoke(url, title, duration, priority, deadlineDay)
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
