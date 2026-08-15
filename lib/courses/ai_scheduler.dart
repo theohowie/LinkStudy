@@ -259,11 +259,13 @@ class AiScheduler {
               '是否开启了 VPN/代理或网络被拦截',
         ),
       );
-    } on http.ClientException {
+    } on http.ClientException catch (e) {
       return AiScheduleOutcomeError(
         AiScheduleError(
           type: AiScheduleErrorType.network,
-          message: '网络连接失败（${config.baseUrl.trim()}），请检查网络后重试',
+          message:
+              '网络连接失败（${config.baseUrl.trim()}）：${e.message}。'
+              '请检查网络；若浏览器可访问但 App 不行，可能是网络限制了非浏览器流量',
         ),
       );
     } catch (e) {
