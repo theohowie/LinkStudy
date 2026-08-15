@@ -293,27 +293,21 @@ class AiScheduler {
     return AiScheduleOutcomeSuccess(parsed);
   }
 
-  /// 网络诊断：GET 根路径 + 小 POST（几十字节）到 chat/completions。
-  /// 用于区分：GET 通 POST 挂 = POST 被网络拦截；
-  /// 小 POST 通但大 POST（AI 排课）挂 = 大请求体被 MTU 黑洞丢弃。
+  /// 网络诊断：GET 根路径 + 三个尺寸的 POST（300B/1200B/2500B）。
+  /// 用于精确定位网络可传输的请求体上限（MTU 黑洞阈值）。
   Future<String> diagnoseConnection(String baseUrl, {String apiKey = ''}) async {
     final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     final getUri = Uri.parse('$base/');
     final postUri = Uri.parse('$base/chat/completions');
-    final getResult = await _probe(
-      'GET',
-      getUri,
-      apiKey: apiKey,
-      body: null,
-    );
-    final postResult = await _probe(
-      'POST',
-      postUri,
-      apiKey: apiKey,
-      body:
-          '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}]}',
-    );
-    return 'GET: $getResult\nPOST(小请求): $postResult';
+    final getResult = await _probe('GET', getUri, apiKey: apiKey, body: null);
+    final results = <String>[];
+    for (final size in const [300, 1200, 2500]) {
+      final body =
+          '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"${'a' * size}"}]}';
+      final result = await _probe('POST', postUri, apiKey: apiKey, body: body);
+      results.add('$size B: $result');
+    }
+    return 'GET: $getResult\n${results.join('\n')}';
   }
 
   Future<String> _probe(
