@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../courses/course_ingest_service.dart';
 import '../courses/link_course.dart';
 import 'app_modal_sheet.dart';
 
@@ -17,6 +18,7 @@ class CoursePendingSheet extends StatefulWidget {
 class _CoursePendingSheetState extends State<CoursePendingSheet> {
   final Set<String> _selected = {};
   bool _deleting = false;
+  bool _adding = false;
 
   List<LinkCourse> get _pending {
     final store = widget.store;
@@ -65,6 +67,178 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
     }
   }
 
+  /// 手动添加课程（不依赖悬浮窗）：表单录入 URL/名称/时长/优先级/截止日期，入库后进入未排课池。
+  Future<void> _addCourse() async {
+    if (_adding) return;
+    final urlController = TextEditingController();
+    final titleController = TextEditingController();
+    final durationController = TextEditingController(text: '40');
+    var priority = CoursePriority.medium;
+    DateTime? deadline;
+
+    String? errorText;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> pickDeadline() async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate:
+                  deadline ?? DateTime.now().add(const Duration(days: 1)),
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (picked != null) {
+              setDialogState(() => deadline = picked);
+            }
+          }
+
+          Future<void> save() async {
+            final duration = int.tryParse(durationController.text.trim());
+            if (duration == null || duration < 1 || duration > 600) {
+              setDialogState(() => errorText = '时长需为 1-600 的整数（分钟）');
+              return;
+            }
+            if (urlController.text.trim().isEmpty) {
+              setDialogState(() => errorText = '请填写课程链接 URL');
+              return;
+            }
+            Navigator.of(dialogContext).pop(true);
+          }
+
+          return AlertDialog(
+            title: const Text('添加课程'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: urlController,
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(
+                      labelText: '链接 URL（必填）',
+                      hintText: 'https://…',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: '课程名称',
+                      hintText: '留空则从链接自动提取',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: durationController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '时长（分钟，1-600）',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<CoursePriority>(
+                    initialValue: priority,
+                    decoration: const InputDecoration(
+                      labelText: '优先级',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: CoursePriority.high,
+                        child: Text('高'),
+                      ),
+                      DropdownMenuItem(
+                        value: CoursePriority.medium,
+                        child: Text('中'),
+                      ),
+                      DropdownMenuItem(
+                        value: CoursePriority.low,
+                        child: Text('低'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => priority = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: pickDeadline,
+                    icon: const Icon(Icons.event_outlined),
+                    label: Text(
+                      deadline == null
+                          ? '截止日期：无（可选）'
+                          : '截止日期：${deadline!.year}-${deadline!.month.toString().padLeft(2, '0')}-${deadline!.day.toString().padLeft(2, '0')}',
+                    ),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorText!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(onPressed: save, child: const Text('保存')),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (saved != true || !mounted) return;
+    final duration = int.parse(durationController.text.trim());
+
+    setState(() => _adding = true);
+    try {
+      final service = CourseIngestService(store: widget.store);
+      final result = await service.ingest(
+        CourseDraft(
+          url: urlController.text,
+          title: titleController.text,
+          durationMinutes: duration,
+          deadlineDay: deadline == null ? null : epochDayOf(deadline!),
+          priority: priority,
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result.success
+                  ? '已添加《${result.course!.title}》，可在池中勾选后排课'
+                  : '添加失败：${result.error}',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -75,21 +249,32 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
             pending.isNotEmpty && pending.every((c) => _selected.contains(c.id));
         return AppSheetScaffold(
           title: Text('未排课课程（${pending.length}）'),
-          subtitle: const Text('勾选要安排学习的课程，可全选或删除'),
-          leading: TextButton.icon(
-            onPressed: pending.isEmpty
-                ? null
-                : () => setState(() {
-                      if (allSelected) {
-                        _selected.clear();
-                      } else {
-                        _selected
-                          ..clear()
-                          ..addAll(pending.map((c) => c.id));
-                      }
-                    }),
-            icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
-            label: Text(allSelected ? '取消全选' : '全选'),
+          subtitle: const Text('勾选要安排学习的课程，可添加、全选或删除'),
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                onPressed: _adding ? null : _addCourse,
+                icon: const Icon(Icons.add),
+                label: const Text('添加'),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed: pending.isEmpty
+                    ? null
+                    : () => setState(() {
+                          if (allSelected) {
+                            _selected.clear();
+                          } else {
+                            _selected
+                              ..clear()
+                              ..addAll(pending.map((c) => c.id));
+                          }
+                        }),
+                icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+                label: Text(allSelected ? '取消全选' : '全选'),
+              ),
+            ],
           ),
           actions: [
             IconButton(

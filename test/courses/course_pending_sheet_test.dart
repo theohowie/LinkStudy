@@ -153,6 +153,29 @@ void main() {
     expect(find.text('暂无未排课课程，先去悬浮窗采集一些吧'), findsOneWidget);
   });
 
+  testWidgets('手动添加课程入池（不依赖悬浮窗）', (tester) async {
+    final store = LinkCourseStore.instance;
+    store.debugClear();
+    await _pumpSheet(tester, store);
+
+    expect(find.text('暂无未排课课程，先去悬浮窗采集一些吧'), findsOneWidget);
+
+    await tester.tap(find.text('添加'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加课程'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), 'https://example.com/manual');
+    await tester.enterText(find.byType(TextField).at(1), '手动课程');
+    await tester.enterText(find.byType(TextField).at(2), '30');
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pumpAndSettle();
+
+    expect(store.courses, hasLength(1));
+    expect(store.pendingCount, 1);
+    expect(find.text('手动课程'), findsOneWidget);
+    expect(find.text('30 分钟'), findsOneWidget);
+  });
+
   testWidgets('无课程时全选与下一步禁用', (tester) async {
     final store = LinkCourseStore.instance;
     store.debugClear();
