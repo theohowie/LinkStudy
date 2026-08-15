@@ -21,6 +21,8 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
   String _model = '';
   bool _loading = true;
   bool _saving = false;
+  bool _testing = false;
+  String? _testResult;
 
   @override
   void initState() {
@@ -63,6 +65,24 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
         _baseUrlController.text = provider.defaultBaseUrl;
       }
       _model = provider.defaultModel;
+    });
+  }
+
+  Future<void> _testConnection() async {
+    if (_testing) return;
+    setState(() {
+      _testing = true;
+      _testResult = null;
+    });
+    final result = await AiScheduler().diagnoseConnection(
+      _baseUrlController.text.trim().isEmpty
+          ? _provider.defaultBaseUrl
+          : _baseUrlController.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testResult = result;
     });
   }
 
@@ -199,6 +219,30 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                       : const Icon(Icons.save_outlined),
                   label: const Text('保存'),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _testing ? null : _testConnection,
+                  icon: _testing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.network_check_outlined),
+                  label: const Text('测试网络连接'),
+                ),
+                if (_testResult != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _testResult!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _testResult!.startsWith('连通')
+                          ? Colors.green
+                          : Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 const Text(
                   'API Key 加密存储在系统安全存储中；Base URL 与模型保存在本机。'

@@ -304,6 +304,31 @@ class AiScheduler {
     return AiScheduleOutcomeSuccess(parsed);
   }
 
+  /// 网络诊断：GET 接口根路径（不带 key，服务器应秒回 401）。
+  /// 用于区分"网络完全不通"与"小请求通、大请求（AI 排课 POST）被丢"（MTU 问题）。
+  Future<String> diagnoseConnection(String baseUrl) async {
+    final uri = Uri.parse(
+      '${baseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/',
+    );
+    final stopwatch = Stopwatch()..start();
+    try {
+      final resp = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 10));
+      stopwatch.stop();
+      return '连通：HTTP ${resp.statusCode}，耗时 ${stopwatch.elapsedMilliseconds}ms';
+    } on TimeoutException {
+      stopwatch.stop();
+      return '超时：10 秒无响应（网络可能不通）';
+    } on http.ClientException catch (e) {
+      stopwatch.stop();
+      return '失败：${e.message}';
+    } catch (e) {
+      stopwatch.stop();
+      return '失败：$e';
+    }
+  }
+
   String _buildUserPrompt({
     required List<LinkCourse> courses,
     required AiSchedulePrefs prefs,
