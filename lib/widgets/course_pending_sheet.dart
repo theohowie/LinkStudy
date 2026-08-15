@@ -67,7 +67,7 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
     }
   }
 
-  /// 手动添加课程（不依赖悬浮窗）：表单录入 URL/名称/时长/优先级/截止日期，入库后进入未排课池。
+  /// 手动添加课程（不依赖悬浮窗）：半弹窗表单录入 URL/名称/时长/优先级/截止日期，入库后进入未排课池。
   Future<void> _addCourse() async {
     if (_adding) return;
     final urlController = TextEditingController();
@@ -78,41 +78,49 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
 
     String? errorText;
 
-    final saved = await showDialog<bool>(
+    final saved = await showAppModalSheet<bool>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          Future<void> pickDeadline() async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate:
-                  deadline ?? DateTime.now().add(const Duration(days: 1)),
-              firstDate: DateTime.now(),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-            );
-            if (picked != null) {
-              setDialogState(() => deadline = picked);
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> pickDeadline() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate:
+                    deadline ?? DateTime.now().add(const Duration(days: 1)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                setSheetState(() => deadline = picked);
+              }
             }
-          }
 
-          Future<void> save() async {
-            final duration = int.tryParse(durationController.text.trim());
-            if (duration == null || duration < 1 || duration > 600) {
-              setDialogState(() => errorText = '时长需为 1-600 的整数（分钟）');
-              return;
+            void save() {
+              final duration = int.tryParse(durationController.text.trim());
+              if (duration == null || duration < 1 || duration > 600) {
+                setSheetState(() => errorText = '时长需为 1-600 的整数（分钟）');
+                return;
+              }
+              if (urlController.text.trim().isEmpty) {
+                setSheetState(() => errorText = '请填写课程链接 URL');
+                return;
+              }
+              Navigator.of(sheetContext).pop(true);
             }
-            if (urlController.text.trim().isEmpty) {
-              setDialogState(() => errorText = '请填写课程链接 URL');
-              return;
-            }
-            Navigator.of(dialogContext).pop(true);
-          }
 
-          return AlertDialog(
-            title: const Text('添加课程'),
-            content: SingleChildScrollView(
+            return AppSheetScaffold(
+              title: const Text('添加课程'),
+              subtitle: const Text('填写课程信息，保存后进入未排课池'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(onPressed: save, child: const Text('保存')),
+              ],
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: urlController,
@@ -168,7 +176,7 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                     ],
                     onChanged: (value) {
                       if (value != null) {
-                        setDialogState(() => priority = value);
+                        setSheetState(() => priority = value);
                       }
                     },
                   ),
@@ -194,17 +202,10 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                   ],
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(onPressed: save, child: const Text('保存')),
-            ],
-          );
-        },
-      ),
+            );
+          },
+        );
+      },
     );
 
     if (saved != true || !mounted) return;
