@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../courses/ai_scheduler.dart';
+import '../widgets/sked_dropdown_menu.dart';
 
-/// AI 排课设置页：提供商（DeepSeek/OpenAI）、Base URL、API Key（加密存储）、模型名。
+/// AI 排课设置页：提供商（DeepSeek/OpenAI）、Base URL、API Key（加密存储）、模型（下拉选择）。
 class AiScheduleSettingsPage extends StatefulWidget {
   const AiScheduleSettingsPage({super.key});
 
@@ -16,7 +17,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
   AiProvider _provider = AiProvider.deepseek;
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
-  final _modelController = TextEditingController();
+  String _model = '';
   bool _loading = true;
   bool _saving = false;
 
@@ -30,7 +31,6 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
   void dispose() {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
-    _modelController.dispose();
     super.dispose();
   }
 
@@ -41,7 +41,10 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
       _provider = config.provider;
       _baseUrlController.text = config.baseUrl;
       _apiKeyController.text = config.apiKey;
-      _modelController.text = config.model;
+      // 存储的模型若不在当前提供商的可选项中，回退到默认模型。
+      _model = _provider.modelOptions.contains(config.model)
+          ? config.model
+          : _provider.defaultModel;
       _loading = false;
     });
   }
@@ -50,22 +53,15 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
     if (provider == _provider) return;
     setState(() {
       _provider = provider;
-      // 切换提供商时自动带默认 Base URL 与模型；若用户已自定义则保留。
+      // 切换提供商时自动带默认 Base URL，模型切换为该提供商默认。
       if (_baseUrlController.text.trim().isEmpty ||
-          _baseUrlController.text.trim() == _provider.defaultBaseUrl ||
           _baseUrlController.text.trim() ==
               AiProvider.values
                   .firstWhere((p) => p != provider)
                   .defaultBaseUrl) {
         _baseUrlController.text = provider.defaultBaseUrl;
       }
-      if (_modelController.text.trim().isEmpty ||
-          _modelController.text.trim() ==
-              AiProvider.values
-                  .firstWhere((p) => p != provider)
-                  .defaultModel) {
-        _modelController.text = provider.defaultModel;
-      }
+      _model = provider.defaultModel;
     });
   }
 
@@ -76,7 +72,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
       await _settings.saveConfig(
         provider: _provider,
         baseUrl: _baseUrlController.text,
-        model: _modelController.text,
+        model: _model,
         apiKey: _apiKeyController.text,
       );
       if (!mounted) return;
@@ -155,13 +151,20 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _modelController,
-                  decoration: const InputDecoration(
-                    hintText: 'deepseek-v4-flash',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                SkedDropdownMenu<String>(
+                  initialSelection: _model,
+                  label: const Text('选择模型'),
+                  leadingIcon: const Icon(Icons.smart_toy_outlined),
+                  expandedInsets: EdgeInsets.zero,
+                  dropdownMenuEntries: [
+                    for (final model in _provider.modelOptions)
+                      DropdownMenuEntry(value: model, label: model),
+                  ],
+                  onSelected: (value) {
+                    if (value != null) {
+                      setState(() => _model = value);
+                    }
+                  },
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(

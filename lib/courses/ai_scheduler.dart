@@ -33,6 +33,16 @@ enum AiProvider {
         AiProvider.deepseek => 'deepseek-v4-flash',
         AiProvider.openai => 'gpt-5.6-sol',
       };
+
+  /// 可选的模型列表（随提供商变化，UI 下拉选择）。
+  List<String> get modelOptions => switch (this) {
+        AiProvider.deepseek => const ['deepseek-v4-flash', 'deepseek-v4-pro'],
+        AiProvider.openai => const [
+            'gpt-5.6-sol',
+            'gpt-5.6-terra',
+            'gpt-5.6-luna',
+          ],
+      };
 }
 
 /// AI 排课服务配置（固定设置）。
