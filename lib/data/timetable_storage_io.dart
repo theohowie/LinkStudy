@@ -8,16 +8,16 @@ import 'timetable_storage.dart';
 
 TimetableStorage createTimetableStorage() => IoTimetableStorage();
 
-/// IO Æ½Ì¨¼ÌĞøÂäÕæÊµÎÄ¼ş£¬ÓÃ»§×Ô¼º±¸·İ»òÕßÅÅ²éÊı¾İÊ±¶¼¸üÖ±¹Û¡£
+/// IO å¹³å°ç»§ç»­è½çœŸå®æ–‡ä»¶ï¼Œç”¨æˆ·è‡ªå·±å¤‡ä»½æˆ–è€…æ’æŸ¥æ•°æ®æ—¶éƒ½æ›´ç›´è§‚ã€‚
 ///
-/// Ğ´Èë²ßÂÔ£¨Ô­×ÓĞ´ + Ğı×ª .bak£©£º
-/// 1. ÏÈ°ÑĞÂÄÚÈİĞ´µ½ `Sked_data.json.tmp` ²¢ flush¡£
-/// 2. Èç¹û `Sked_data.json` ´æÔÚ£¬ÏÈ°ÑËüÖØÃüÃûÎª `Sked_data.json.bak`
-///    £¨ÒÑÓĞµÄ .bak »á±»¸²¸Ç£¬Ö»±£Áô×î½üÒ»·İ£©¡£
-/// 3. °Ñ `.tmp` ÖØÃüÃûÎª `Sked_data.json`¡£
+/// å†™å…¥ç­–ç•¥ï¼ˆåŸå­å†™ + æ—‹è½¬ .bakï¼‰ï¼š
+/// 1. å…ˆæŠŠæ–°å†…å®¹å†™åˆ° `Sked_data.json.tmp` å¹¶ flushã€‚
+/// 2. å¦‚æœ `Sked_data.json` å­˜åœ¨ï¼Œå…ˆæŠŠå®ƒé‡å‘½åä¸º `Sked_data.json.bak`
+///    ï¼ˆå·²æœ‰çš„ .bak ä¼šè¢«è¦†ç›–ï¼Œåªä¿ç•™æœ€è¿‘ä¸€ä»½ï¼‰ã€‚
+/// 3. æŠŠ `.tmp` é‡å‘½åä¸º `Sked_data.json`ã€‚
 ///
-/// ¼ÓÔØ²ßÂÔ£ºÏÈ³¢ÊÔÖ÷ÎÄ¼ş£»½âÎöÊ§°Ü»òÖ÷ÎÄ¼şÈ±Ê§Ôò³¢ÊÔ `.bak`£»¶¼Ê§°ÜÔòÉÏ±¨
-/// [RecoveryStatus.failedBackupRestore]¡£
+/// åŠ è½½ç­–ç•¥ï¼šå…ˆå°è¯•ä¸»æ–‡ä»¶ï¼›è§£æå¤±è´¥æˆ–ä¸»æ–‡ä»¶ç¼ºå¤±åˆ™å°è¯• `.bak`ï¼›éƒ½å¤±è´¥åˆ™ä¸ŠæŠ¥
+/// [RecoveryStatus.failedBackupRestore]ã€‚
 class IoTimetableStorage implements TimetableStorage {
   IoTimetableStorage({Future<Directory> Function()? directoryProvider})
     : _directoryProvider =
@@ -57,8 +57,8 @@ class IoTimetableStorage implements TimetableStorage {
       );
     }
 
-    // Ö÷ÎÄ¼ş²»´æÔÚ / ¿ÕÄÚÈİ£ºÈç¹û .bak Ò²Ã»ÓĞ£¬¾Íµ±Ê×´ÎÆô¶¯£»Èô .bak ÓĞ£¬
-    // ËµÃ÷ÉÏ´ÎĞ´Èë±ÀÔÚ rename Ö®¼ä£¬ÓÃ .bak »Ö¸´¡£
+    // ä¸»æ–‡ä»¶ä¸å­˜åœ¨ / ç©ºå†…å®¹ï¼šå¦‚æœ .bak ä¹Ÿæ²¡æœ‰ï¼Œå°±å½“é¦–æ¬¡å¯åŠ¨ï¼›è‹¥ .bak æœ‰ï¼Œ
+    // è¯´æ˜ä¸Šæ¬¡å†™å…¥å´©åœ¨ rename ä¹‹é—´ï¼Œç”¨ .bak æ¢å¤ã€‚
     final backupAttempt = await _tryDecode(backup);
     if (mainAttempt.outcome == _Outcome.missing &&
         backupAttempt.outcome == _Outcome.missing) {
@@ -78,7 +78,7 @@ class IoTimetableStorage implements TimetableStorage {
       );
     }
 
-    // Ö÷ÎÄ¼ş´æÔÚµ«Ëğ»µ / .bak ²»´æÔÚ»òËğ»µ£ºÎŞ·¨»Ö¸´ÈÎºÎÊı¾İ¡£
+    // ä¸»æ–‡ä»¶å­˜åœ¨ä½†æŸå / .bak ä¸å­˜åœ¨æˆ–æŸåï¼šæ— æ³•æ¢å¤ä»»ä½•æ•°æ®ã€‚
     if (mainAttempt.outcome == _Outcome.corrupt ||
         backupAttempt.outcome == _Outcome.corrupt) {
       return const StorageLoadResult(
@@ -87,7 +87,7 @@ class IoTimetableStorage implements TimetableStorage {
       );
     }
 
-    // ¶µµ×£ºÖ÷ÎÄ¼şÈ±Ê§ + .bak È±Ê§ÒÑ¾­ÔÚÉÏÃæÀ¹½Ø£¬ÕâÀï×ß²»µ½¡£
+    // å…œåº•ï¼šä¸»æ–‡ä»¶ç¼ºå¤± + .bak ç¼ºå¤±å·²ç»åœ¨ä¸Šé¢æ‹¦æˆªï¼Œè¿™é‡Œèµ°ä¸åˆ°ã€‚
     return const StorageLoadResult.empty();
   }
 
@@ -97,7 +97,7 @@ class IoTimetableStorage implements TimetableStorage {
     final tmp = File('${main.path}$_tempSuffix');
     final backup = File('${main.path}$_backupSuffix');
 
-    // 1. Ğ´Èë .tmp ²¢ flush£¬È·±£Êı¾İÕæµÄÂäÅÌ¡£
+    // 1. å†™å…¥ .tmp å¹¶ flushï¼Œç¡®ä¿æ•°æ®çœŸçš„è½ç›˜ã€‚
     final raf = await tmp.open(mode: FileMode.write);
     try {
       await raf.writeString(data.encode());
@@ -106,7 +106,7 @@ class IoTimetableStorage implements TimetableStorage {
       await raf.close();
     }
 
-    // 2. Ğı×ª£º°ÑÏÖÓĞÖ÷ÎÄ¼şÒÆµ½ .bak£¨¸²¸Ç¾É .bak£©£¬ÔÙ°Ñ .tmp ÉıÎªÖ÷ÎÄ¼ş¡£
+    // 2. æ—‹è½¬ï¼šæŠŠç°æœ‰ä¸»æ–‡ä»¶ç§»åˆ° .bakï¼ˆè¦†ç›–æ—§ .bakï¼‰ï¼Œå†æŠŠ .tmp å‡ä¸ºä¸»æ–‡ä»¶ã€‚
     if (await main.exists()) {
       if (await backup.exists()) {
         await backup.delete();

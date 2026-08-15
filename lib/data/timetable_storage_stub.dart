@@ -5,7 +5,7 @@ import 'timetable_storage.dart';
 
 TimetableStorage createTimetableStorage() => _BrowserTimetableStorage();
 
-/// Web Ã»ÓĞÎÈ¶¨µÄ±¾µØÎÄ¼şÂ·¾¶£¬¾ÍÍË»Øä¯ÀÀÆ÷´æ´¢£¬µ«Êı¾İ¸ñÊ½»¹ÊÇ±£³ÖÍ¬Ò»·İ JSON¡£
+/// Web æ²¡æœ‰ç¨³å®šçš„æœ¬åœ°æ–‡ä»¶è·¯å¾„ï¼Œå°±é€€å›æµè§ˆå™¨å­˜å‚¨ï¼Œä½†æ•°æ®æ ¼å¼è¿˜æ˜¯ä¿æŒåŒä¸€ä»½ JSONã€‚
 class _BrowserTimetableStorage implements TimetableStorage {
   static const _storageKey = 'Sked_app_data';
 
@@ -22,7 +22,7 @@ class _BrowserTimetableStorage implements TimetableStorage {
         recoveryStatus: RecoveryStatus.none,
       );
     } catch (_) {
-      // ä¯ÀÀÆ÷Ã»ÓĞ .bak ºó×º£¬Ö»ÄÜÉÏ±¨Ê§°ÜÈÃ UI ÌáÊ¾ÓÃ»§¡£
+      // æµè§ˆå™¨æ²¡æœ‰ .bak åç¼€ï¼Œåªèƒ½ä¸ŠæŠ¥å¤±è´¥è®© UI æç¤ºç”¨æˆ·ã€‚
       return const StorageLoadResult(
         data: null,
         recoveryStatus: RecoveryStatus.failedBackupRestore,

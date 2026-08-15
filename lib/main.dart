@@ -17,6 +17,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
+import 'courses/course_ingest_service.dart';
+import 'courses/link_course.dart';
+import 'courses/link_study_grid_sync.dart';
 import 'platform/overlay_client.dart';
 import 'providers/timetable_provider.dart';
 import 'screens/app_home_screen.dart';
@@ -43,17 +46,51 @@ Future<void> main() async {
       );
     }
   }
-  overlayClient.draftsSaved.listen((d) {
-    debugPrint('[overlay] draft saved: ${d.url} | ${d.title} | ${d.durationMinutes}min');
-  });
-  overlayClient.capturedUrls.listen((urls) {
-    debugPrint('[overlay] captured urls: $urls');
-  });
-  overlayClient.overlayTapped.listen((_) {
-    debugPrint('[overlay] tapped');
+  // LinkStudy 课程入库：加载课程存储，悬浮窗面板保存的草稿经接口类解析校验后写入本地课程表。
+  // EventChannel 只订阅一次，按 type 分发（多次订阅会导致原生侧 sink 覆盖、事件丢失）。
+  final courseStore = LinkCourseStore.instance;
+  await courseStore.ensureLoaded();
+  final ingestService = CourseIngestService(store: courseStore);
+  overlayClient.events.listen((raw) async {
+    if (raw is! Map) return;
+    final type = raw['type'];
+    switch (type) {
+      case 'onDraftSaved':
+        final url = raw['url'] as String? ?? '';
+        final title = raw['title'] as String? ?? '';
+        final duration = (raw['durationMinutes'] as num?)?.toInt() ?? 0;
+        debugPrint('[linkstudy] overlay draft: $url | $title | ${duration}min');
+        final result = await ingestService.ingest(
+          CourseDraft(url: url, title: title, durationMinutes: duration),
+        );
+        if (result.success) {
+          final c = result.course!;
+          debugPrint('[linkstudy] course saved: ${c.title} (${c.url}) ${c.durationMinutes}min');
+        } else {
+          debugPrint('[linkstudy] ingest rejected: ${result.error}');
+        }
+      case 'onUrlsCaptured':
+        debugPrint('[linkstudy] captured urls: ${raw['urls']}');
+      case 'onOverlayTapped':
+        debugPrint('[linkstudy] overlay tapped');
+    }
   });
   final provider = TimetableProvider();
   unawaited(provider.load());
+  // LinkStudy 课表 → 首页日程网格：provider 加载完成后同步一次，课程/槽位变化时重新同步
+  final gridSync = LinkStudyGridSync(provider: provider, store: courseStore);
+  var gridSynced = false;
+  provider.addListener(() {
+    if (provider.isLoaded && !gridSynced) {
+      gridSynced = true;
+      unawaited(gridSync.sync());
+    }
+  });
+  courseStore.addListener(() {
+    if (provider.isLoaded) {
+      unawaited(gridSync.sync());
+    }
+  });
   runApp(MyApp(provider: provider));
 }
 

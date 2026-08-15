@@ -61,20 +61,17 @@ class OverlayClient {
       _method.invokeMethod('setPanelColors', colors);
 
   /// 采集事件流：拖放 / 剪贴板导入的 URL 列表。
-  Stream<List<String>> get capturedUrls => _events
-      .receiveBroadcastStream()
+  Stream<List<String>> get capturedUrls => events
       .where((e) => e is Map && e['type'] == 'onUrlsCaptured')
       .map((e) => List<String>.from((e as Map)['urls'] as List));
 
   /// 用户点击悬浮球（Flutter 决定展开确认卡/队列）。
-  Stream<void> get overlayTapped => _events
-      .receiveBroadcastStream()
+  Stream<void> get overlayTapped => events
       .where((e) => e is Map && e['type'] == 'onOverlayTapped')
       .map((_) {});
 
   /// 悬浮面板保存课程草稿（url/title/durationMinutes）。
-  Stream<DraftSaved> get draftsSaved => _events
-      .receiveBroadcastStream()
+  Stream<DraftSaved> get draftsSaved => events
       .where((e) => e is Map && e['type'] == 'onDraftSaved')
       .map((e) {
     final m = e as Map;
@@ -84,4 +81,8 @@ class OverlayClient {
       durationMinutes: (m['durationMinutes'] as num).toInt(),
     );
   });
+
+  /// 统一事件流：EventChannel 只应被订阅一次，调用方按 type 分发，
+  /// 避免多次 receiveBroadcastStream 在原生侧互相覆盖 sink 导致事件丢失。
+  Stream<Object?> get events => _events.receiveBroadcastStream();
 }
