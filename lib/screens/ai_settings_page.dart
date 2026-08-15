@@ -158,7 +158,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                 TextField(
                   controller: _modelController,
                   decoration: const InputDecoration(
-                    hintText: 'deepseek-chat',
+                    hintText: 'deepseek-v4-flash',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),

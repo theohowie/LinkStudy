@@ -30,8 +30,8 @@ enum AiProvider {
       };
 
   String get defaultModel => switch (this) {
-        AiProvider.deepseek => 'deepseek-chat',
-        AiProvider.openai => 'gpt-4o-mini',
+        AiProvider.deepseek => 'deepseek-v4-flash',
+        AiProvider.openai => 'gpt-5.6-sol',
       };
 }
 
