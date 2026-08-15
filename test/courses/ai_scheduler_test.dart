@@ -141,16 +141,53 @@ void main() {
       final messages = body['messages'] as List<dynamic>;
       final system = messages[0]['content'] as String;
       final user = messages[1]['content'] as String;
-      expect(system, contains('排课原则'));
+      expect(system, contains('排课规划助手'));
       expect(system, contains('restAfterMinutes'));
       expect(user, contains('课程a'));
       expect(user, contains('60分钟'));
       expect(user, contains('中等'));
-      expect(user, contains('3 天'));
+      expect(user, contains('天数:3'));
       expect(user, contains('周一下午有课'));
       expect(user, contains('晚上 19:00-22:00'));
       expect(user, contains('08:00-12:00'));
       expect(body['model'], 'deepseek-chat');
+    });
+
+    test('请求体保持精简（MTU 黑洞环境下大请求会被丢）', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      final courses = [
+        for (var i = 0; i < 5; i++)
+          _course('course_$i', duration: 40 + i * 10),
+      ];
+      await AiScheduler(client: client).schedule(
+        courses: courses,
+        prefs: const AiSchedulePrefs(
+          intensity: StudyIntensity.stressed,
+          days: 5,
+          notes: '周一二有安排，周三晚上有会',
+          timePreference: '晚上 19:00-22:00',
+        ),
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final bytes = utf8.encode(capturedBody!).length;
+      // 5 门课程 + 完整设置的请求体应远小于 MTU 分片阈值（1500），保证单包可达。
+      expect(bytes, lessThan(1500), reason: '请求体 $bytes 字节过大，MTU 黑洞下会被丢弃');
     });
 
     test('未配置 API Key 返回 notConfigured（不发请求）', () async {

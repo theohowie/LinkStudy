@@ -157,20 +157,9 @@ class AiScheduleOutcomeError extends AiScheduleOutcome {
 }
 
 /// 内置"排课 Skill"（system prompt）：AI 的排课方法论与输出契约。
+/// 刻意精简以减小请求体（MTU 黑洞环境下大请求会被丢弃）。
 const aiScheduleSystemPrompt = '''
-你是专业的课程时间规划助手，负责为用户安排网课学习计划。
-
-排课原则：
-1. 截止日期近的课程优先安排；截止日期相同则优先级高（high > medium > low）优先。
-2. 在用户给定的计划天数内，把课程均匀分配到每天，避免单日负担过重。
-3. 同一天安排多门课程时，在课程之间安排休息时间：学习强度越轻松休息越长（轻松约 20-40 分钟、中等约 10-20 分钟、压力约 5-10 分钟），同时参考课程时长（课程越长休息越久）。
-4. 尽量贴合用户偏好的学习时间段；如果用户备注了某些时间段已有安排，绝不能把课程安排到那些时间。
-5. 每天的学习只能安排在用户给定的时间窗内（开始 ~ 午休开始、午休结束 ~ 结束；午休时间不能排课）。
-6. 每门课程时长固定（分钟）；休息时间是建议值，可以设为 0。
-
-输出必须是严格的 JSON，不要输出任何其他文字、解释或 markdown：
-{"order":[{"courseId":"课程id","restAfterMinutes":休息分钟数}],"reason":"用一两句话说明排课思路"}
-其中 order 数组的顺序就是学习顺序，必须包含输入的全部课程且每门只出现一次。
+你是排课规划助手。规则：1)截止日近、优先级高者先排；2)按计划天数均摊每日；3)同日多课间按强度休息（轻松20-40/中等10-20/压力5-10分钟，课长休息久）；4)贴合偏好时间，备注中已有安排的时间绝不排课；5)只能在时间窗内排课；6)休息可为0。只输出JSON：{"order":[{"courseId":"id","restAfterMinutes":N}],"reason":"一句话"}，order含全部课程各一次。
 ''';
 
 /// AI 排课客户端：组装 Prompt → 调用 OpenAI 兼容接口 → 解析固定格式。
@@ -368,31 +357,33 @@ class AiScheduler {
     required String localeCode,
   }) {
     final intensityLabel = switch (prefs.intensity) {
-      StudyIntensity.relaxed => '轻松（休息长一点，节奏舒缓）',
-      StudyIntensity.medium => '中等（正常节奏）',
-      StudyIntensity.stressed => '压力（紧凑高效，休息短）',
+      StudyIntensity.relaxed => '轻松',
+      StudyIntensity.medium => '中等',
+      StudyIntensity.stressed => '压力',
     };
     final timePreference =
-        prefs.timePreference.trim().isEmpty ? '全天（无特别偏好）' : prefs.timePreference.trim();
-    final notes = prefs.notes.trim().isEmpty
-        ? '无'
-        : prefs.notes.trim();
+        prefs.timePreference.trim().isEmpty ? '全天' : prefs.timePreference.trim();
+    final notes = prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim();
     final courseLines = [
       for (final c in courses)
-        '- id: ${c.id}, 名称: ${c.title}, 时长: ${c.durationMinutes}分钟'
-            ', 截止: ${c.deadlineDay == null ? '无' : '${c.deadlineDay!}（epochDay）'}'
-            ', 优先级: ${c.priority.name}, 链接: ${c.url.isEmpty ? '无' : c.url}',
-    ].join('\n');
+        '${c.id}|${c.title}|${c.durationMinutes}分钟|${c.priority.name}'
+            '${c.deadlineDay == null ? '' : '|截止${c.deadlineDay}'}'
+            '|${_domainOf(c.url)}',
+    ].join(';');
     return [
-      '当前语言：$localeCode',
-      '学习强度：$intensityLabel',
-      '计划天数：${prefs.days} 天（从今天起 ${prefs.days} 天内安排）',
-      '用户备注（这些时间已有安排，不能排课）：$notes',
-      '时间偏好：$timePreference',
-      '每天可用时间窗（本地强制约束）：$window',
-      '课程清单：',
-      courseLines,
+      '语言:$localeCode 强度:$intensityLabel 天数:${prefs.days} 备注:$notes 偏好:$timePreference 时间窗:$window',
+      '课程:$courseLines',
     ].join('\n');
+  }
+
+  /// 提取 URL 域名（仅作提示用，避免长链接撑大请求体）。
+  static String _domainOf(String url) {
+    try {
+      final host = Uri.parse(url.trim()).host;
+      return host.isEmpty ? '' : host;
+    } catch (_) {
+      return '';
+    }
   }
 
   /// 解析 AI 响应中的固定格式 JSON。
