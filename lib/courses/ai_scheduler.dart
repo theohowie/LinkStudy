@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HandshakeException;
+import 'dart:io' show HandshakeException, HttpClient;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/secret_store.dart';
@@ -175,9 +176,17 @@ const aiScheduleSystemPrompt = '''
 /// AI 排课客户端：组装 Prompt → 调用 OpenAI 兼容接口 → 解析固定格式。
 class AiScheduler {
   AiScheduler({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? _defaultClient();
 
   final http.Client _client;
+
+  /// 默认客户端：设置 TCP 连接超时，避免 IPv6 地址不可达时连接挂起
+  /// （Dart 顺序尝试解析出的地址，IPv6 挂起会导致整体超时；8 秒后自动回退 IPv4）。
+  static http.Client _defaultClient() {
+    final httpClient = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 8);
+    return IOClient(httpClient);
+  }
 
   /// 请求 AI 排课。
   Future<AiScheduleOutcome> schedule({
