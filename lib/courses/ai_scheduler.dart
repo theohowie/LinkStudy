@@ -235,14 +235,16 @@ class AiScheduler {
       return AiScheduleOutcomeError(
         AiScheduleError(
           type: AiScheduleErrorType.network,
-          message: 'AI 请求超时（${config.timeout.inSeconds} 秒），请稍后重试',
+          message:
+              'AI 请求超时（${config.timeout.inSeconds} 秒）：${config.baseUrl.trim()} 无响应。'
+              '请检查网络；使用 OpenAI 需确保设备可直连 api.openai.com',
         ),
       );
     } on http.ClientException {
       return AiScheduleOutcomeError(
         AiScheduleError(
           type: AiScheduleErrorType.network,
-          message: '网络连接失败，请检查网络后重试',
+          message: '网络连接失败（${config.baseUrl.trim()}），请检查网络后重试',
         ),
       );
     } catch (e) {

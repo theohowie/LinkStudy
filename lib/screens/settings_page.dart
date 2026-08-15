@@ -2,6 +2,7 @@ import '../models/app_data.dart';
 import '../models/general_models.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -391,7 +392,17 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsSectionHeader(title: 'AI 排课'),
               SettingsListTile(
-                leading: const Icon(Icons.psychology_outlined),
+                leading: SvgPicture.asset(
+                  'assets/icons/ai_status.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                    BlendMode.srcIn,
+                  ),
+                ),
                 title: 'AI 排课设置',
                 subtitle: 'DeepSeek / OpenAI 接口，用于智能排课',
                 trailing: const Icon(Icons.keyboard_arrow_right),
