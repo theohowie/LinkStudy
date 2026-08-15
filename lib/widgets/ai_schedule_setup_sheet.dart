@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../courses/ai_schedule_runner.dart';
 import '../courses/ai_scheduler.dart';
 import '../courses/link_course.dart';
 import '../providers/timetable_provider.dart';
@@ -15,14 +18,12 @@ class AiScheduleSetupSheet extends StatefulWidget {
     required this.provider,
     required this.courseIds,
     this.settings,
-    this.scheduler,
   });
 
   final LinkCourseStore store;
   final TimetableProvider provider;
   final List<String> courseIds;
   final AiScheduleSettings? settings;
-  final AiScheduler? scheduler;
 
   @override
   State<AiScheduleSetupSheet> createState() => _AiScheduleSetupSheetState();
@@ -31,14 +32,12 @@ class AiScheduleSetupSheet extends StatefulWidget {
 class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   late final AiScheduleSettings _settings =
       widget.settings ?? AiScheduleSettings();
-  late final AiScheduler _scheduler = widget.scheduler ?? AiScheduler();
 
   StudyIntensity _intensity = StudyIntensity.medium;
   int _days = 7;
   ScheduleStartMode _startMode = ScheduleStartMode.now;
   final TextEditingController _notes = TextEditingController();
   final TextEditingController _timePreference = TextEditingController();
-  bool _running = false;
 
   @override
   void initState() {
@@ -93,7 +92,11 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   }
 
   Future<void> _run() async {
-    if (_running) return;
+    if (AiScheduleRunner.instance.isRunning) {
+      _showSnack('已有排课任务进行中，请稍候');
+      return;
+    }
+    final provider = widget.provider;
     final prefs = AiSchedulePrefs(
       intensity: _intensity,
       days: _days,
@@ -101,56 +104,25 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       timePreference: _timePreference.text.trim(),
       startMode: _startMode,
     );
-    setState(() => _running = true);
-    try {
-      final provider = widget.provider;
-      final availability = availabilityFromDayWindow(
-        startMinute: provider.generalDayStartMinute,
-        lunchStartMinute: provider.generalLunchStartMinute,
-        lunchEndMinute: provider.generalLunchEndMinute,
-        endMinute: provider.generalDayEndMinute,
-      );
-      final config = await _settings.loadConfig(
-        windowDescription: _windowDescription,
-      );
-      final courses = widget.courseIds
-          .map(widget.store.courseById)
-          .whereType<LinkCourse>()
-          .toList();
-      final outcome = await _scheduler.schedule(
-        courses: courses,
+    final availability = availabilityFromDayWindow(
+      startMinute: provider.generalDayStartMinute,
+      lunchStartMinute: provider.generalLunchStartMinute,
+      lunchEndMinute: provider.generalLunchEndMinute,
+      endMinute: provider.generalDayEndMinute,
+    );
+    // 后台静默排课：立即关闭弹窗，任务在后台执行，完成时发通知。
+    unawaited(
+      AiScheduleRunner.instance.start(
+        courseIds: widget.courseIds,
         prefs: prefs,
-        config: config,
+        availability: availability,
+        windowDescription: _windowDescription,
         localeCode: provider.localeCode,
-      );
-
-      switch (outcome) {
-        case AiScheduleOutcomeSuccess(:final value):
-          final ordered = value.ordered
-              .where((o) => widget.courseIds.contains(o.courseId))
-              .toList();
-          final result = await widget.store.scheduleWithOrder(
-            courseIds: widget.courseIds,
-            ordered: ordered,
-            days: prefs.days,
-            availabilityByWeekday: availability,
-            startFromNow: prefs.startMode == ScheduleStartMode.now,
-          );
-          await _settings.saveSetupPrefs(prefs);
-          final failNote = result.failures.isEmpty
-              ? ''
-              : '，${result.failures.length} 门未能排上';
-          _showSnack('AI 排课完成：${result.placements.length} 门已安排$failNote');
-          if (mounted) Navigator.of(context).pop();
-        case AiScheduleOutcomeError(:final error):
-          // 不自动回退排课：课程保留在未排课池中，用户处理（如配置/更换模型）后可重新 AI 排课。
-          await _settings.saveSetupPrefs(prefs);
-          _showSnack('AI 排课失败：${error.message}（课程仍留在未排课池，可修改后重试）');
-          if (mounted) setState(() => _running = false);
-      }
-    } catch (e) {
-      _showSnack('排课出错：$e');
-      if (mounted) setState(() => _running = false);
+      ),
+    );
+    if (mounted) {
+      _showSnack('已开始后台排课，完成时会通知你，可随时打开查看进度');
+      Navigator.of(context).pop();
     }
   }
 
@@ -162,40 +134,17 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       subtitle: const Text('告诉 AI 你的学习节奏，剩下的交给它'),
       actions: [
         TextButton(
-          onPressed: _running ? null : () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: _running ? null : _run,
-          child: _running
-              ? const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 8),
-                    Text('排课中…'),
-                  ],
-                )
-              : const Text('开始 AI 排课'),
+          onPressed: _run,
+          child: const Text('开始 AI 排课'),
         ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_running)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                '正在请求 AI，网络较慢时可能需要 1-2 分钟，请稍候…',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
           Text('学习强度', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<StudyIntensity>(
@@ -217,9 +166,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
               ),
             ],
             selected: {_intensity},
-            onSelectionChanged: _running
-                ? null
-                : (selection) => setState(() => _intensity = selection.first),
+            onSelectionChanged: (selection) => setState(() => _intensity = selection.first),
           ),
           const SizedBox(height: 16),
           Text('计划 $_days 天学完', style: theme.textTheme.titleSmall),
@@ -229,9 +176,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
             max: 14,
             divisions: 13,
             label: '$_days 天',
-            onChanged: _running
-                ? null
-                : (v) => setState(() => _days = v.round()),
+            onChanged: (v) => setState(() => _days = v.round()),
           ),
           const SizedBox(height: 16),
           Text('开始时间', style: theme.textTheme.titleSmall),
@@ -250,9 +195,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
               ),
             ],
             selected: {_startMode},
-            onSelectionChanged: _running
-                ? null
-                : (selection) => setState(() => _startMode = selection.first),
+            onSelectionChanged: (selection) => setState(() => _startMode = selection.first),
           ),
           const SizedBox(height: 8),
           Text(
@@ -262,7 +205,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
           const SizedBox(height: 8),
           TextField(
             controller: _notes,
-            enabled: !_running,
+            enabled: true,
             maxLines: 2,
             minLines: 1,
             decoration: const InputDecoration(
@@ -279,7 +222,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
           const SizedBox(height: 8),
           TextField(
             controller: _timePreference,
-            enabled: !_running,
+            enabled: true,
             decoration: const InputDecoration(
               hintText: '如：晚上 19:00-22:00、每天上午',
               border: OutlineInputBorder(),

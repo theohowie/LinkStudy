@@ -23,6 +23,7 @@ import 'courses/link_study_grid_sync.dart';
 import 'platform/overlay_client.dart';
 import 'providers/timetable_provider.dart';
 import 'screens/app_home_screen.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +90,8 @@ Future<void> main() async {
   });
   final provider = TimetableProvider();
   unawaited(provider.load());
+  // 本地通知初始化（后台 AI 排课完成/失败提醒）。
+  unawaited(NotificationService.instance.ensureInitialized());
   // LinkStudy 课表 → 首页日程网格：provider 加载完成后同步一次，课程/槽位变化时重新同步
   final gridSync = LinkStudyGridSync(provider: provider, store: courseStore);
   var gridSynced = false;

@@ -8,6 +8,7 @@ import 'package:lunar/lunar.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../courses/ai_schedule_runner.dart';
 import '../courses/link_course.dart';
 import '../providers/timetable_provider.dart';
 import '../utils/general_schedule_colors.dart';
@@ -19,6 +20,7 @@ import '../widgets/expressive_dialog.dart';
 import '../widgets/expressive_motion.dart';
 import '../widgets/general_event_details_sheet.dart';
 import '../widgets/general_event_editor_sheet.dart';
+import '../widgets/ai_schedule_progress_sheet.dart';
 import 'settings_page.dart';
 
 part 'general_schedule_list_view.dart';
@@ -521,6 +523,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   }
 
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。
+  /// AI 排课进行中时改为打开进度面板（查看思考过程与结果）。
   Future<void> _openPendingCourses(
     BuildContext context,
     TimetableProvider provider,
@@ -530,6 +533,17 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     }
     _setUiBusyFlag(() => _pendingSheetOpen = true);
     try {
+      final runner = AiScheduleRunner.instance;
+      if (runner.isRunning || runner.hasUnviewedResult) {
+        await showAppModalSheet<void>(
+          context: context,
+          maxWidth: appSheetWidthMedium,
+          builder: (sheetContext) =>
+              AiScheduleProgressSheet(store: LinkCourseStore.instance),
+        );
+        runner.markViewed();
+        return;
+      }
       final selected = await showAppModalSheet<List<String>>(
         context: context,
         maxWidth: appSheetWidthMedium,
@@ -554,7 +568,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   }
 }
 
-/// 排课按钮：展示未排课数量角标，点击进入未排课池。
+/// 排课按钮：展示未排课数量角标；AI 排课进行中时显示进度状态，点击查看进度。
 class _PendingCoursesAction extends StatelessWidget {
   const _PendingCoursesAction({
     required this.disabled,
@@ -567,10 +581,28 @@ class _PendingCoursesAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = LinkCourseStore.instance;
+    final runner = AiScheduleRunner.instance;
     return AnimatedBuilder(
-      animation: store,
+      animation: Listenable.merge([store, runner]),
       builder: (context, child) {
+        final running = runner.isRunning;
         final count = store.pendingCount;
+        if (running) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ),
+            ),
+          );
+        }
         return Badge(
           isLabelVisible: count > 0,
           label: Text('$count'),

@@ -30,6 +30,7 @@ dependencies:
   lunar: ^1.7.8
   flutter_secure_storage: ^10.3.1
   flutter_svg: ^2.2.1
+  flutter_local_notifications: ^22.3.0
 
 dev_dependencies:
   flutter_test:
