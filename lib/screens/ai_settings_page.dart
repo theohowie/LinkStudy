@@ -4,9 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../courses/ai_scheduler.dart';
 import '../widgets/sked_dropdown_menu.dart';
 
-/// DeepSeek 品牌蓝。
-const _deepseekBrandColor = Color(0xFF4D6BFE);
-
 /// AI 排课设置页：提供商（DeepSeek/OpenAI）、Base URL、API Key（加密存储）、模型（下拉选择）。
 class AiScheduleSettingsPage extends StatefulWidget {
   const AiScheduleSettingsPage({super.key});
@@ -110,8 +107,10 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                         'assets/icons/deepseek.svg',
                         width: 18,
                         height: 18,
-                        colorFilter: const ColorFilter.mode(
-                          _deepseekBrandColor,
+                        colorFilter: ColorFilter.mode(
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
                           BlendMode.srcIn,
                         ),
                       ),
@@ -176,7 +175,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                 SkedDropdownMenu<String>(
                   initialSelection: _model,
                   label: const Text('选择模型'),
-                  leadingIcon: const Icon(Icons.smart_toy_outlined),
+                  leadingIcon: const Icon(Icons.memory_outlined),
                   expandedInsets: EdgeInsets.zero,
                   dropdownMenuEntries: [
                     for (final model in _provider.modelOptions)

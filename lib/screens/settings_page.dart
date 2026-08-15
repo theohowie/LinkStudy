@@ -391,7 +391,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               SettingsSectionHeader(title: 'AI 排课'),
               SettingsListTile(
-                leading: const Icon(Icons.auto_awesome_outlined),
+                leading: const Icon(Icons.schedule_outlined),
                 title: 'AI 排课设置',
                 subtitle: 'DeepSeek / OpenAI 接口，用于智能排课',
                 trailing: const Icon(Icons.keyboard_arrow_right),
