@@ -304,22 +304,54 @@ class AiScheduler {
     return AiScheduleOutcomeSuccess(parsed);
   }
 
-  /// 网络诊断：GET 接口根路径（不带 key，服务器应秒回 401）。
-  /// 用于区分"网络完全不通"与"小请求通、大请求（AI 排课 POST）被丢"（MTU 问题）。
-  Future<String> diagnoseConnection(String baseUrl) async {
-    final uri = Uri.parse(
-      '${baseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/',
+  /// 网络诊断：GET 根路径 + 小 POST（几十字节）到 chat/completions。
+  /// 用于区分：GET 通 POST 挂 = POST 被网络拦截；
+  /// 小 POST 通但大 POST（AI 排课）挂 = 大请求体被 MTU 黑洞丢弃。
+  Future<String> diagnoseConnection(String baseUrl, {String apiKey = ''}) async {
+    final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final getUri = Uri.parse('$base/');
+    final postUri = Uri.parse('$base/chat/completions');
+    final getResult = await _probe(
+      'GET',
+      getUri,
+      apiKey: apiKey,
+      body: null,
     );
+    final postResult = await _probe(
+      'POST',
+      postUri,
+      apiKey: apiKey,
+      body:
+          '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}]}',
+    );
+    return 'GET: $getResult\nPOST(小请求): $postResult';
+  }
+
+  Future<String> _probe(
+    String method,
+    Uri uri, {
+    required String apiKey,
+    required String? body,
+  }) async {
     final stopwatch = Stopwatch()..start();
     try {
-      final resp = await _client
-          .get(uri)
+      final request = http.Request(method, uri);
+      if (body != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.body = body;
+      }
+      if (apiKey.trim().isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer ${apiKey.trim()}';
+      }
+      final streamed = await _client
+          .send(request)
           .timeout(const Duration(seconds: 10));
+      final resp = await http.Response.fromStream(streamed);
       stopwatch.stop();
-      return '连通：HTTP ${resp.statusCode}，耗时 ${stopwatch.elapsedMilliseconds}ms';
+      return 'HTTP ${resp.statusCode}，${stopwatch.elapsedMilliseconds}ms';
     } on TimeoutException {
       stopwatch.stop();
-      return '超时：10 秒无响应（网络可能不通）';
+      return '超时（10 秒无响应）';
     } on http.ClientException catch (e) {
       stopwatch.stop();
       return '失败：${e.message}';

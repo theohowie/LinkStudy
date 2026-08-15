@@ -78,6 +78,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
       _baseUrlController.text.trim().isEmpty
           ? _provider.defaultBaseUrl
           : _baseUrlController.text,
+      apiKey: _apiKeyController.text,
     );
     if (!mounted) return;
     setState(() {
@@ -237,9 +238,11 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                     _testResult!,
                     style: TextStyle(
                       fontSize: 13,
-                      color: _testResult!.startsWith('连通')
-                          ? Colors.green
-                          : Theme.of(context).colorScheme.error,
+                      height: 1.5,
+                      color: _testResult!.contains('超时') ||
+                              _testResult!.contains('失败')
+                          ? Theme.of(context).colorScheme.error
+                          : Colors.green,
                     ),
                   ),
                 ],
