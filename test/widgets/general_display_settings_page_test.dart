@@ -58,6 +58,10 @@ void main() {
   testWidgets('shows default view as a setting instead of page tabs', (
     tester,
   ) async {
+    // 页面含午休设置后内容变长，放大视口确保底部项可见。
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final provider = await _createProvider();
 
     await _pumpPage(tester, provider);

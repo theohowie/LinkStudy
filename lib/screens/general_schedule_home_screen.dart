@@ -7,9 +7,12 @@ import 'package:lunar/lunar.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../courses/link_course.dart';
 import '../providers/timetable_provider.dart';
 import '../utils/general_schedule_colors.dart';
 import '../widgets/app_modal_sheet.dart';
+import '../widgets/ai_schedule_setup_sheet.dart';
+import '../widgets/course_pending_sheet.dart';
 import '../widgets/expressive_empty_state.dart';
 import '../widgets/expressive_dialog.dart';
 import '../widgets/expressive_motion.dart';
@@ -41,6 +44,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   bool _moreOccurrencesSheetOpen = false;
   bool _calendarManagerOpen = false;
   bool _settingsPageOpen = false;
+  bool _pendingSheetOpen = false;
 
   @override
   void didChangeDependencies() {
@@ -87,6 +91,10 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
           ),
         ),
         actions: [
+          _PendingCoursesAction(
+            disabled: _pendingSheetOpen,
+            onPressed: () => _openPendingCourses(context, provider),
+          ),
           _CalendarManagerAction(
             expanded: MediaQuery.sizeOf(context).width >= 1000,
             disabled: _calendarManagerOpen,
@@ -497,6 +505,70 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     } finally {
       _setUiBusyFlag(() => _settingsPageOpen = false);
     }
+  }
+
+  /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。
+  Future<void> _openPendingCourses(
+    BuildContext context,
+    TimetableProvider provider,
+  ) async {
+    if (_pendingSheetOpen) {
+      return;
+    }
+    _setUiBusyFlag(() => _pendingSheetOpen = true);
+    try {
+      final selected = await showAppModalSheet<List<String>>(
+        context: context,
+        maxWidth: appSheetWidthMedium,
+        builder: (sheetContext) =>
+            CoursePendingSheet(store: LinkCourseStore.instance),
+      );
+      if (selected == null || selected.isEmpty || !mounted || !context.mounted) {
+        return;
+      }
+      await showAppModalSheet<void>(
+        context: context,
+        maxWidth: appSheetWidthMedium,
+        builder: (sheetContext) => AiScheduleSetupSheet(
+          store: LinkCourseStore.instance,
+          provider: provider,
+          courseIds: selected,
+        ),
+      );
+    } finally {
+      _setUiBusyFlag(() => _pendingSheetOpen = false);
+    }
+  }
+}
+
+/// 排课按钮：展示未排课数量角标，点击进入未排课池。
+class _PendingCoursesAction extends StatelessWidget {
+  const _PendingCoursesAction({
+    required this.disabled,
+    required this.onPressed,
+  });
+
+  final bool disabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = LinkCourseStore.instance;
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, child) {
+        final count = store.pendingCount;
+        return Badge(
+          isLabelVisible: count > 0,
+          label: Text('$count'),
+          child: IconButton(
+            icon: const Icon(Icons.event_note_outlined),
+            tooltip: '未排课课程（$count）',
+            onPressed: disabled ? null : onPressed,
+          ),
+        );
+      },
+    );
   }
 }
 

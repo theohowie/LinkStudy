@@ -1,0 +1,318 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:linkstudy/courses/ai_scheduler.dart';
+import 'package:linkstudy/courses/link_course.dart';
+import 'package:linkstudy/services/secret_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeSecretStore implements SecretStore {
+  String aiKey = '';
+
+  @override
+  Future<String> readAiSchedulerApiKey() async => aiKey;
+
+  @override
+  Future<void> writeAiSchedulerApiKey(String value) async {
+    aiKey = value;
+  }
+
+  @override
+  Future<String> readCustomSchoolImportApiKey() async => '';
+
+  @override
+  Future<void> writeCustomSchoolImportApiKey(String value) async {}
+}
+
+LinkCourse _course(String id, {int duration = 40}) => LinkCourse(
+      id: id,
+      url: 'https://example.com/$id',
+      title: '课程$id',
+      durationMinutes: duration,
+      createdAt: DateTime(2026, 1, 5),
+    );
+
+AiScheduleConfig _config({String apiKey = 'sk-test'}) => AiScheduleConfig(
+      provider: AiProvider.deepseek,
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: apiKey,
+      model: 'deepseek-chat',
+      windowDescription: '08:00-12:00 与 13:00-23:00',
+    );
+
+void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  const prefs = AiSchedulePrefs(
+    intensity: StudyIntensity.medium,
+    days: 3,
+    notes: '周一下午有课',
+    timePreference: '晚上 19:00-22:00',
+  );
+
+  group('AiScheduler.schedule', () {
+    test('成功：标准格式解析出顺序与休息', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":15},'
+                      '{"courseId":"b","restAfterMinutes":0}],'
+                      '"reason":"截止日期优先"}',
+                },
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a'), _course('b')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final success = outcome as AiScheduleOutcomeSuccess;
+      expect(success.value.ordered, hasLength(2));
+      expect(success.value.ordered[0].courseId, 'a');
+      expect(success.value.ordered[0].restAfterMinutes, 15);
+      expect(success.value.ordered[1].restAfterMinutes, 0);
+      expect(success.value.reason, '截止日期优先');
+    });
+
+    test('容错：markdown 代码块包裹与裸数组', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': '```json\n[{"courseId":"a"}]\n```',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final success = outcome as AiScheduleOutcomeSuccess;
+      expect(success.value.ordered.single.courseId, 'a');
+      expect(success.value.ordered.single.restAfterMinutes, 0);
+    });
+
+    test('请求包含内置排课 Skill 与课程/设置数据', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      await AiScheduler(client: client).schedule(
+        courses: [_course('a', duration: 60), _course('b')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      final system = messages[0]['content'] as String;
+      final user = messages[1]['content'] as String;
+      expect(system, contains('排课原则'));
+      expect(system, contains('restAfterMinutes'));
+      expect(user, contains('课程a'));
+      expect(user, contains('60分钟'));
+      expect(user, contains('中等'));
+      expect(user, contains('3 天'));
+      expect(user, contains('周一下午有课'));
+      expect(user, contains('晚上 19:00-22:00'));
+      expect(user, contains('08:00-12:00'));
+      expect(body['model'], 'deepseek-chat');
+    });
+
+    test('未配置 API Key 返回 notConfigured（不发请求）', () async {
+      var requested = false;
+      final client = MockClient((request) async {
+        requested = true;
+        return http.Response('{}', 200);
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(apiKey: ''),
+        localeCode: 'zh-CN',
+      );
+      expect(requested, isFalse);
+      final error = outcome as AiScheduleOutcomeError;
+      expect(error.error.type, AiScheduleErrorType.notConfigured);
+    });
+
+    test('HTTP 非 2xx 返回 http 错误', () async {
+      final client = MockClient((request) async {
+        return http.Response('bad key', 401);
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final error = outcome as AiScheduleOutcomeError;
+      expect(error.error.type, AiScheduleErrorType.http);
+      expect(error.error.message, contains('401'));
+    });
+
+    test('网络异常返回 network 错误', () async {
+      final client = MockClient((request) async {
+        throw http.ClientException('connection refused');
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final error = outcome as AiScheduleOutcomeError;
+      expect(error.error.type, AiScheduleErrorType.network);
+    });
+
+    test('响应内容无法解析返回 parse 错误', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {'message': {'content': '我不是 JSON'}},
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final error = outcome as AiScheduleOutcomeError;
+      expect(error.error.type, AiScheduleErrorType.parse);
+    });
+
+    test('AI 返回空顺序返回 empty 错误', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {'message': {'content': '{"order":[],"reason":"没有课程"}'}},
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final error = outcome as AiScheduleOutcomeError;
+      expect(error.error.type, AiScheduleErrorType.empty);
+    });
+  });
+
+  group('AiScheduleSettings', () {
+    test('保存并读回上次排课设置', () async {
+      final settings = AiScheduleSettings(secretStore: _FakeSecretStore());
+      expect(await settings.loadSetupPrefs(), isNull);
+      await settings.saveSetupPrefs(
+        const AiSchedulePrefs(
+          intensity: StudyIntensity.stressed,
+          days: 5,
+          notes: '周三有会',
+          timePreference: '上午',
+        ),
+      );
+      final loaded = await settings.loadSetupPrefs();
+      expect(loaded, isNotNull);
+      expect(loaded!.intensity, StudyIntensity.stressed);
+      expect(loaded.days, 5);
+      expect(loaded.notes, '周三有会');
+      expect(loaded.timePreference, '上午');
+    });
+
+    test('配置读写（API Key 走加密存储）', () async {
+      final store = _FakeSecretStore();
+      final settings = AiScheduleSettings(secretStore: store);
+      await settings.saveConfig(
+        provider: AiProvider.openai,
+        baseUrl: 'https://custom.example.com/v1',
+        model: 'gpt-test',
+        apiKey: 'sk-secret',
+      );
+      final loaded = await settings.loadConfig(
+        windowDescription: '09:00-18:00',
+      );
+      expect(loaded.provider, AiProvider.openai);
+      expect(loaded.baseUrl, 'https://custom.example.com/v1');
+      expect(loaded.model, 'gpt-test');
+      expect(loaded.apiKey, 'sk-secret');
+      expect(loaded.windowDescription, '09:00-18:00');
+      expect(store.aiKey, 'sk-secret');
+    });
+  });
+
+  group('availabilityFromDayWindow', () {
+    test('正常午休拆分为两个时段', () {
+      final days = availabilityFromDayWindow(
+        startHour: 8,
+        lunchStartHour: 12,
+        lunchEndHour: 13,
+        endHour: 22,
+      );
+      expect(days, hasLength(7));
+      final slots = days.first;
+      expect(slots, hasLength(2));
+      expect(slots[0].startMinute, 8 * 60);
+      expect(slots[0].endMinute, 12 * 60);
+      expect(slots[1].startMinute, 13 * 60);
+      expect(slots[1].endMinute, 22 * 60);
+    });
+
+    test('午休无效时退化为单时段', () {
+      final days = availabilityFromDayWindow(
+        startHour: 8,
+        lunchStartHour: 8,
+        lunchEndHour: 8,
+        endHour: 22,
+      );
+      final slots = days.first;
+      expect(slots, hasLength(1));
+      expect(slots.single.startMinute, 8 * 60);
+      expect(slots.single.endMinute, 22 * 60);
+    });
+  });
+}

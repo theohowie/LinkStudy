@@ -40,6 +40,38 @@ DateTime localDateFromEpochDay(int day) {
   return DateTime(utc.year, utc.month, utc.day);
 }
 
+/// 从通用显示设置（开始/午休/结束时间，小时级）构建每天的学习可用时段（7 天相同）。
+/// 时段 = [开始, 午休开始) + [午休结束, 结束)；午休无效时退化为 [开始, 结束)；
+/// 全部无效时回退默认 19:00-22:00。
+List<List<AvailabilitySlot>> availabilityFromDayWindow({
+  required int startHour,
+  required int lunchStartHour,
+  required int lunchEndHour,
+  required int endHour,
+}) {
+  final morningStart = startHour.clamp(0, 23) * 60;
+  final lunchStart = lunchStartHour.clamp(0, 24) * 60;
+  final lunchEnd = lunchEndHour.clamp(0, 24) * 60;
+  final eveningEnd = endHour.clamp(1, 24) * 60;
+
+  final slots = <AvailabilitySlot>[];
+  if (lunchStart > morningStart) {
+    slots.add(
+      AvailabilitySlot(startMinute: morningStart, endMinute: lunchStart),
+    );
+  }
+  if (eveningEnd > lunchEnd) {
+    slots.add(AvailabilitySlot(startMinute: lunchEnd, endMinute: eveningEnd));
+  }
+  if (slots.isEmpty && eveningEnd > morningStart) {
+    slots.add(AvailabilitySlot(startMinute: morningStart, endMinute: eveningEnd));
+  }
+  return List.generate(
+    7,
+    (_) => slots.isEmpty ? defaultAvailability() : List.unmodifiable(slots),
+  );
+}
+
 /// 排课槽位：课程在课表中的位置（排课日期 + 星期几 + 起止分钟）。
 class ScheduleSlot {
   final String courseId;
@@ -195,7 +227,8 @@ class LinkCourseStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 添加课程并自动排课（悬浮窗草稿/手动录入的统一入口）。
+  /// 添加课程（悬浮窗草稿/手动录入的统一入口）。
+  /// 课程先进"未排课池"（不自动排课），由用户在排课流程中统一安排。
   Future<LinkCourse> addCourse({
     required String url,
     required String title,
@@ -213,13 +246,58 @@ class LinkCourseStore extends ChangeNotifier {
       priority: priority,
     );
     _courses = [..._courses, course];
-    await schedulePending();
     notifyListeners();
     await _persist();
     return course;
   }
 
-  /// 对全部待排课程执行自动排课（覆盖式重建槽位，保留手动锁定槽位）。
+  /// 未排课数量（暂无槽位的课程数）。
+  int get pendingCount =>
+      _courses.where((c) => !_slots.any((s) => s.courseId == c.id)).length;
+
+  /// 按 AI 顺序排课：对 [courseIds]（本次勾选的课程）移除旧槽位，
+  /// 按 [ordered]（可为空=默认贪心顺序）在 [days] 天窗口内落位；
+  /// [availabilityByWeekday] 为每天可用时段（来自通用显示设置）。
+  Future<SchedulingResult> scheduleWithOrder({
+    required List<String> courseIds,
+    required List<OrderedCourse> ordered,
+    required int days,
+    required List<List<AvailabilitySlot>> availabilityByWeekday,
+  }) async {
+    final ids = courseIds.toSet();
+    final pending = _courses.where((c) => ids.contains(c.id)).toList();
+    // 移除这些课程的旧槽位（重新排）。
+    _slots = _slots.where((s) => !ids.contains(s.courseId)).toList();
+    if (pending.isEmpty) {
+      notifyListeners();
+      await _persist();
+      return const SchedulingResult(placements: [], failures: []);
+    }
+    final result = scheduleCourses(
+      pending: pending,
+      availabilityByWeekday: availabilityByWeekday,
+      occupied: _occupiedFromSlots(_slots),
+      today: DateTime.now(),
+      ordered: ordered.isEmpty ? null : ordered,
+      horizonDays: days.clamp(1, 30),
+    );
+    final added = [
+      for (final p in result.placements)
+        ScheduleSlot(
+          courseId: p.courseId,
+          epochDay: p.day,
+          weekday: p.weekday,
+          startMinute: p.start,
+          endMinute: p.end,
+        ),
+    ];
+    _slots = [..._slots, ...added];
+    notifyListeners();
+    await _persist();
+    return result;
+  }
+
+  /// 对全部待排课程执行自动排课（贪心兜底；AI 不可用时的回退路径）。
   Future<SchedulingResult> schedulePending() async {
     final pending = _courses
         .where((c) => !_slots.any((s) => s.courseId == c.id))
@@ -227,15 +305,10 @@ class LinkCourseStore extends ChangeNotifier {
     if (pending.isEmpty) {
       return const SchedulingResult(placements: [], failures: []);
     }
-    // 已占用区间（现有槽位 + 排课过程中新增），用于冲突检测。
-    final occupied = <int, List<({int start, int end})>>{};
-    for (final s in _slots) {
-      (occupied[s.weekday] ??= []).add((start: s.startMinute, end: s.endMinute));
-    }
     final result = scheduleCourses(
       pending: pending,
       availabilityByWeekday: _availability,
-      occupied: occupied,
+      occupied: _occupiedFromSlots(_slots),
       today: DateTime.now(),
     );
     final added = [
@@ -252,6 +325,16 @@ class LinkCourseStore extends ChangeNotifier {
     notifyListeners();
     await _persist();
     return result;
+  }
+
+  static Map<int, List<({int start, int end})>> _occupiedFromSlots(
+    List<ScheduleSlot> slots,
+  ) {
+    final occupied = <int, List<({int start, int end})>>{};
+    for (final s in slots) {
+      (occupied[s.weekday] ??= []).add((start: s.startMinute, end: s.endMinute));
+    }
+    return occupied;
   }
 
   /// 某天的槽位（按开始时间排序），附课程。
@@ -286,6 +369,10 @@ class LinkCourseStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 仅测试用：跳过持久化（widget 测试的 FakeAsync 环境无法完成真实文件 I/O）。
+  @visibleForTesting
+  bool debugSkipPersist = false;
+
   Future<File> _resolveFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_fileName');
@@ -297,6 +384,7 @@ class LinkCourseStore extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
+    if (debugSkipPersist) return;
     try {
       final file = await _resolveFile();
       final backup = File('${file.path}$_backupSuffix');

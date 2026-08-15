@@ -116,6 +116,8 @@ class GeneralCalendarService {
     bool? showLunarCalendar,
     int? dayStartHour,
     int? dayEndHour,
+    int? lunchStartHour,
+    int? lunchEndHour,
     int? timeGridMinutes,
     bool? closeEventPopupOnOutsideTap,
   }) {
@@ -125,6 +127,8 @@ class GeneralCalendarService {
       showLunarCalendar: showLunarCalendar,
       dayStartHour: dayStartHour,
       dayEndHour: dayEndHour,
+      lunchStartHour: lunchStartHour,
+      lunchEndHour: lunchEndHour,
       timeGridMinutes: timeGridMinutes,
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
     );

@@ -1665,6 +1665,12 @@ class AppLocalizationsSl extends AppLocalizations {
   String get endHour => 'End hour';
 
   @override
+  String get lunchStartHour => 'Lunch break starts';
+
+  @override
+  String get lunchEndHour => 'Lunch break ends';
+
+  @override
   String get timeGridDensity => 'Time grid density';
 
   @override

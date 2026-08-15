@@ -102,6 +102,8 @@ void main() {
         title: '悬浮窗网课',
         durationMinutes: 40,
       );
+      // 采集入池后需排课才有槽位；这里用贪心兜底模拟排课完成。
+      await store.schedulePending();
       final slot = store.slots.singleWhere((s) => s.courseId == course.id);
       await sync.sync();
 

@@ -18,6 +18,8 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
   bool get generalShowLunarCalendar => _appData.generalMode.showLunarCalendar;
   int get generalDayStartHour => _appData.generalMode.dayStartHour;
   int get generalDayEndHour => _appData.generalMode.dayEndHour;
+  int get generalLunchStartHour => _appData.generalMode.lunchStartHour;
+  int get generalLunchEndHour => _appData.generalMode.lunchEndHour;
   int get generalTimeGridMinutes => _appData.generalMode.timeGridMinutes;
   bool get closeGeneralEventPopupOnOutsideTap =>
       _appData.generalMode.closeEventPopupOnOutsideTap;
@@ -103,6 +105,8 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
     bool? showLunarCalendar,
     int? dayStartHour,
     int? dayEndHour,
+    int? lunchStartHour,
+    int? lunchEndHour,
     int? timeGridMinutes,
     bool? closeEventPopupOnOutsideTap,
   }) async {
@@ -114,6 +118,8 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
         showLunarCalendar: showLunarCalendar,
         dayStartHour: dayStartHour,
         dayEndHour: dayEndHour,
+        lunchStartHour: lunchStartHour,
+        lunchEndHour: lunchEndHour,
         timeGridMinutes: timeGridMinutes,
         closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
       ),

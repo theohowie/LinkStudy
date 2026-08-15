@@ -123,6 +123,81 @@ void main() {
       expect(p.day, epochDayOf(DateTime(2026, 1, 5)));
     });
 
+    test('F4-7: AI 顺序优先于默认排序', () {
+      final result = scheduleCourses(
+        pending: [
+          course(id: 'later', deadline: 20),
+          course(id: 'sooner', deadline: 2),
+        ],
+        availabilityByWeekday: availability,
+        occupied: const {},
+        today: today,
+        ordered: [
+          (courseId: 'later', restAfterMinutes: 0),
+          (courseId: 'sooner', restAfterMinutes: 0),
+        ],
+      );
+      expect(result.failures, isEmpty);
+      final later = result.placements.firstWhere((p) => p.courseId == 'later');
+      final sooner = result.placements.firstWhere((p) => p.courseId == 'sooner');
+      // AI 顺序让 later 先占今天 19:00，sooner 只能排到其后。
+      expect(later.start, 19 * 60);
+      expect(sooner.start, greaterThan(later.start));
+    });
+
+    test('F4-8: 课后休息并入占用，后续课程不会紧贴', () {
+      final result = scheduleCourses(
+        pending: [
+          course(id: 'a', duration: 40),
+          course(id: 'b', duration: 40),
+          course(id: 'c', duration: 40),
+        ],
+        availabilityByWeekday: availability,
+        occupied: const {},
+        today: today,
+        ordered: const [
+          (courseId: 'a', restAfterMinutes: 30),
+          (courseId: 'b', restAfterMinutes: 30),
+          (courseId: 'c', restAfterMinutes: 0),
+        ],
+      );
+      expect(result.failures, isEmpty);
+      final byId = {
+        for (final p in result.placements) p.courseId: p,
+      };
+      expect(byId['a']!.start, 19 * 60);
+      // a 结束 19:40 + 休息 30 → b 从 20:10 开始。
+      expect(byId['b']!.start, 20 * 60 + 10);
+      // b 结束 20:50 + 休息 30 → c 从 21:20 开始。
+      expect(byId['c']!.start, 21 * 60 + 20);
+    });
+
+    test('F4-9: 计划天数窗口生效（今天占满时 1 天失败、7 天成功）', () {
+      const fullToday = {
+        1: [(start: 19 * 60, end: 22 * 60)],
+      };
+      final oneDay = scheduleCourses(
+        pending: [course(id: 'a', duration: 40)],
+        availabilityByWeekday: availability,
+        occupied: fullToday,
+        today: today,
+        horizonDays: 1,
+      );
+      expect(oneDay.placements, isEmpty);
+      expect(oneDay.failures, hasLength(1));
+
+      final sevenDays = scheduleCourses(
+        pending: [course(id: 'a', duration: 40)],
+        availabilityByWeekday: availability,
+        occupied: fullToday,
+        today: today,
+        horizonDays: 7,
+      );
+      expect(sevenDays.placements, hasLength(1));
+      // 今天周一占满 → 顺延到周二。
+      expect(sevenDays.placements.single.weekday, 2);
+    });
+
     test('空待安排返回空结果', () {
       final result = scheduleCourses(
         pending: const [],

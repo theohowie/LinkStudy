@@ -143,6 +143,8 @@ class GeneralScheduleData {
     this.showLunarCalendar = true,
     this.dayStartHour = 6,
     this.dayEndHour = 23,
+    this.lunchStartHour = 12,
+    this.lunchEndHour = 13,
     this.timeGridMinutes = 60,
     this.closeEventPopupOnOutsideTap = true,
     this.themeMode = defaultThemeMode,
@@ -160,6 +162,8 @@ class GeneralScheduleData {
   final bool showLunarCalendar;
   final int dayStartHour;
   final int dayEndHour;
+  final int lunchStartHour;
+  final int lunchEndHour;
   final int timeGridMinutes;
   final bool closeEventPopupOnOutsideTap;
   final String themeMode;
@@ -203,6 +207,8 @@ class GeneralScheduleData {
     'showLunarCalendar': showLunarCalendar,
     'dayStartHour': dayStartHour,
     'dayEndHour': dayEndHour,
+    'lunchStartHour': lunchStartHour,
+    'lunchEndHour': lunchEndHour,
     'timeGridMinutes': timeGridMinutes,
     'closeEventPopupOnOutsideTap': closeEventPopupOnOutsideTap,
     'themeMode': normalizeThemeMode(themeMode),
@@ -262,6 +268,10 @@ class GeneralScheduleData {
       showLunarCalendar: _boolValue(json['showLunarCalendar']) ?? true,
       dayStartHour: (_intValue(json['dayStartHour']) ?? 6).clamp(0, 23).toInt(),
       dayEndHour: (_intValue(json['dayEndHour']) ?? 23).clamp(1, 24).toInt(),
+      lunchStartHour:
+          (_intValue(json['lunchStartHour']) ?? 12).clamp(0, 23).toInt(),
+      lunchEndHour:
+          (_intValue(json['lunchEndHour']) ?? 13).clamp(1, 24).toInt(),
       timeGridMinutes: _normalizeGridMinutes(
         _intValue(json['timeGridMinutes']),
       ),
@@ -303,6 +313,8 @@ class GeneralScheduleData {
     bool? showLunarCalendar,
     int? dayStartHour,
     int? dayEndHour,
+    int? lunchStartHour,
+    int? lunchEndHour,
     int? timeGridMinutes,
     bool? closeEventPopupOnOutsideTap,
     String? themeMode,
@@ -322,6 +334,8 @@ class GeneralScheduleData {
       showLunarCalendar: showLunarCalendar ?? this.showLunarCalendar,
       dayStartHour: dayStartHour ?? this.dayStartHour,
       dayEndHour: dayEndHour ?? this.dayEndHour,
+      lunchStartHour: lunchStartHour ?? this.lunchStartHour,
+      lunchEndHour: lunchEndHour ?? this.lunchEndHour,
       timeGridMinutes: timeGridMinutes ?? this.timeGridMinutes,
       closeEventPopupOnOutsideTap:
           closeEventPopupOnOutsideTap ?? this.closeEventPopupOnOutsideTap,
@@ -402,6 +416,8 @@ class GeneralScheduleData {
         : normalizedSchedules.first.id;
     final start = dayStartHour.clamp(0, 23).toInt();
     final end = dayEndHour.clamp(start + 1, 24).toInt();
+    final lunchStart = lunchStartHour.clamp(start, end - 1).toInt();
+    final lunchEnd = lunchEndHour.clamp(lunchStart + 1, end).toInt();
     final acknowledgementsByKey = <String, GeneralReminderAcknowledgement>{};
     for (final acknowledgement in reminderAcknowledgements) {
       final normalized = acknowledgement.normalized();
@@ -427,6 +443,8 @@ class GeneralScheduleData {
       showLunarCalendar: showLunarCalendar,
       dayStartHour: start,
       dayEndHour: end,
+      lunchStartHour: lunchStart,
+      lunchEndHour: lunchEnd,
       timeGridMinutes: _normalizeGridMinutes(timeGridMinutes),
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
       themeMode: normalizeThemeMode(themeMode),

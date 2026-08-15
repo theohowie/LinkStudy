@@ -24,6 +24,7 @@ import '../widgets/settings_list.dart';
 import 'general_display_settings_page.dart';
 import 'language_settings_page.dart';
 import 'overlay_settings_page.dart';
+import 'ai_settings_page.dart';
 import 'theme_settings_page.dart';
 
 enum _GeneralDataAction {
@@ -56,6 +57,7 @@ enum _SettingsFlow {
   generalDataActions,
   appDataActions,
   overlaySettings,
+  aiScheduleSettings,
   privacyPolicy,
   licensesPage,
   updateCheck,
@@ -387,6 +389,16 @@ class _SettingsPageState extends State<SettingsPage> {
                     ? null
                     : () => _openOverlaySettingsPage(),
               ),
+              SettingsSectionHeader(title: 'AI 排课'),
+              SettingsListTile(
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: 'AI 排课设置',
+                subtitle: 'DeepSeek / OpenAI 接口，用于智能排课',
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.aiScheduleSettings)
+                    ? null
+                    : () => _openAiScheduleSettingsPage(),
+              ),
               SettingsSectionHeader(title: l10n.settingsSectionAppearance),
               SettingsListTile(
                 leading: const Icon(Icons.palette_outlined),
@@ -507,6 +519,16 @@ class _SettingsPageState extends State<SettingsPage> {
       );
       // 返回后刷新样式/透明度摘要
       await _loadOverlayState();
+    });
+  }
+
+  Future<void> _openAiScheduleSettingsPage() async {
+    await _guardFlow(_SettingsFlow.aiScheduleSettings, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const AiScheduleSettingsPage(),
+        ),
+      );
     });
   }
 

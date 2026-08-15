@@ -3105,6 +3105,18 @@ abstract class AppLocalizations {
   /// **'End hour'**
   String get endHour;
 
+  /// No description provided for @lunchStartHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Lunch break starts'**
+  String get lunchStartHour;
+
+  /// No description provided for @lunchEndHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Lunch break ends'**
+  String get lunchEndHour;
+
   /// No description provided for @timeGridDensity.
   ///
   /// In en, this message translates to:

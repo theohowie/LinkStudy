@@ -38,29 +38,30 @@ class SchedulingResult {
   bool get allScheduled => failures.isEmpty;
 }
 
+/// AI 排课顺序项：课程 id + 课后休息分钟（AI 决定休息时长，本地落位时并入占用）。
+typedef OrderedCourse = ({String courseId, int restAfterMinutes});
+
 /// 对"待安排"课程执行自动排课。
 ///
 /// [pending] 待安排课程；[availabilityByWeekday] 每天可用时段（index 0=周一 … 6=周日）；
 /// [occupied] 已占用区间（weekday → 起止分钟列表，含锁定槽位）；[today] 今天（锚定排课日期）。
+/// [ordered] 可选：AI 给出的课程顺序与课后休息，提供时优先按此顺序落位（未覆盖的课程按默认排序补排）；
+/// [horizonDays] 排课窗口天数（默认 7；AI 排课按"计划天数"传入）。
 SchedulingResult scheduleCourses({
   required List<LinkCourse> pending,
   required List<List<AvailabilitySlot>> availabilityByWeekday,
   required Map<int, List<({int start, int end})>> occupied,
   required DateTime today,
+  List<OrderedCourse>? ordered,
+  int horizonDays = 7,
 }) {
   if (pending.isEmpty) {
     return const SchedulingResult(placements: [], failures: []);
   }
 
-  // 排序：截止升序 → 优先级降序 → 录入升序。
-  final sorted = [...pending]..sort((a, b) {
-      final byDeadline = _deadlineValue(a).compareTo(_deadlineValue(b));
-      if (byDeadline != 0) return byDeadline;
-      final byPriority =
-          priorityWeight(b.priority).compareTo(priorityWeight(a.priority));
-      if (byPriority != 0) return byPriority;
-      return a.createdAt.compareTo(b.createdAt);
-    });
+  // 排序：优先 AI 顺序（ordered 内按序，未覆盖的按默认排序补排）；
+  // 无 ordered 时默认：截止升序 → 优先级降序 → 录入升序。
+  final sorted = _orderPending(pending, ordered);
 
   final placements = <SchedulePlacement>[];
   final failures = <({String courseId, String reason})>[];
@@ -75,22 +76,60 @@ SchedulingResult scheduleCourses({
       occupied: occ,
       availabilityByWeekday: availabilityByWeekday,
       today: today,
+      horizonDays: horizonDays,
     );
     if (placed == null) {
       failures.add((
         courseId: course.id,
-        reason: '《${course.title}》时长 ${course.durationMinutes} 分钟，未来 7 天无足够空档',
+        reason: '《${course.title}》时长 ${course.durationMinutes} 分钟，未来 $horizonDays 天无足够空档',
       ));
       continue;
     }
     placements.add(placed);
+    // 课后休息并入占用：AI 建议的休息在时段内生效；clamp 0-120 防止过大休息挤掉课程。
+    final rest = _restAfterFor(course.id, ordered).clamp(0, 120);
     (occ[placed.weekday] ??= []).add(
-      (start: placed.start, end: placed.end),
+      (start: placed.start, end: placed.end + rest),
     );
     occ[placed.weekday] = _sortedOccupied(occ[placed.weekday]);
   }
 
   return SchedulingResult(placements: placements, failures: failures);
+}
+
+/// 按 AI 顺序（含未覆盖补排）整理待排课程。
+List<LinkCourse> _orderPending(
+  List<LinkCourse> pending,
+  List<OrderedCourse>? ordered,
+) {
+  final sorted = [...pending]..sort(_defaultOrder);
+  if (ordered == null || ordered.isEmpty) {
+    return sorted;
+  }
+  final orderIndex = <String, int>{
+    for (var i = 0; i < ordered.length; i++) ordered[i].courseId: i,
+  };
+  final inOrder = sorted.where((c) => orderIndex.containsKey(c.id)).toList()
+    ..sort((a, b) => orderIndex[a.id]!.compareTo(orderIndex[b.id]!));
+  final rest = sorted.where((c) => !orderIndex.containsKey(c.id)).toList();
+  return [...inOrder, ...rest];
+}
+
+int _defaultOrder(LinkCourse a, LinkCourse b) {
+  final byDeadline = _deadlineValue(a).compareTo(_deadlineValue(b));
+  if (byDeadline != 0) return byDeadline;
+  final byPriority =
+      priorityWeight(b.priority).compareTo(priorityWeight(a.priority));
+  if (byPriority != 0) return byPriority;
+  return a.createdAt.compareTo(b.createdAt);
+}
+
+int _restAfterFor(String courseId, List<OrderedCourse>? ordered) {
+  if (ordered == null) return 0;
+  for (final item in ordered) {
+    if (item.courseId == courseId) return item.restAfterMinutes;
+  }
+  return 0;
 }
 
 /// 尝试为课程放置槽位；失败返回 null。
@@ -99,12 +138,13 @@ SchedulePlacement? _placeCourse(
   required Map<int, List<({int start, int end})>> occupied,
   required List<List<AvailabilitySlot>> availabilityByWeekday,
   required DateTime today,
+  required int horizonDays,
 }) {
   final duration = course.durationMinutes;
   if (duration <= 0) return null;
 
   final todayWeekday = today.weekday;
-  for (var offset = 0; offset < 7; offset++) {
+  for (var offset = 0; offset < horizonDays; offset++) {
     final weekday = ((todayWeekday - 1 + offset) % 7) + 1;
     final dayAvailability = availabilityByWeekday.length >= weekday
         ? availabilityByWeekday[weekday - 1]

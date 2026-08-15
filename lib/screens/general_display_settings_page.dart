@@ -95,6 +95,30 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                 onChanged: (value) =>
                     provider.updateGeneralDisplaySettings(dayEndHour: value),
               ),
+              SettingsSliderTile(
+                icon: Icons.free_breakfast_outlined,
+                title: l10n.lunchStartHour,
+                value: provider.generalLunchStartHour,
+                min: provider.generalDayStartHour,
+                max: provider.generalLunchEndHour - 1,
+                label:
+                    '${provider.generalLunchStartHour.toString().padLeft(2, '0')}:00',
+                onChanged: (value) => provider.updateGeneralDisplaySettings(
+                  lunchStartHour: value,
+                ),
+              ),
+              SettingsSliderTile(
+                icon: Icons.free_breakfast_outlined,
+                title: l10n.lunchEndHour,
+                value: provider.generalLunchEndHour,
+                min: provider.generalLunchStartHour + 1,
+                max: provider.generalDayEndHour,
+                label:
+                    '${provider.generalLunchEndHour.toString().padLeft(2, '0')}:00',
+                onChanged: (value) => provider.updateGeneralDisplaySettings(
+                  lunchEndHour: value,
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SkedDropdownMenu<int>(

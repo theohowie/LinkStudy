@@ -171,6 +171,10 @@ void main() {
   testWidgets('theme settings entry ignores rapid duplicate taps', (
     tester,
   ) async {
+    // 设置页含 AI 排课分组后内容变长，放大视口确保 Theme 项可见。
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final provider = await _createProvider(_buildGeneralData());
     await _pumpSettingsPage(tester, provider);
 

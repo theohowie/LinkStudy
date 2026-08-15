@@ -1588,6 +1588,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get endHour => '结束小时';
 
   @override
+  String get lunchStartHour => '午休开始';
+
+  @override
+  String get lunchEndHour => '午休结束';
+
+  @override
   String get timeGridDensity => '时间网格密度';
 
   @override
@@ -3317,6 +3323,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get endHour => '結束小時';
+
+  @override
+  String get lunchStartHour => '午休開始';
+
+  @override
+  String get lunchEndHour => '午休結束';
 
   @override
   String get timeGridDensity => '時間格線密度';
