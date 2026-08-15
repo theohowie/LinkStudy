@@ -1,0 +1,328 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:linkstudy/data/timetable_storage.dart';
+import 'package:linkstudy/data/timetable_storage_io.dart';
+import 'package:linkstudy/models/app_data.dart';
+import 'package:linkstudy/models/general_event.dart';
+import 'package:linkstudy/models/general_schedule.dart';
+import 'package:linkstudy/models/general_schedule_data.dart';
+
+void main() {
+  late Directory tempDir;
+  late IoTimetableStorage storage;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('sked_storage_test_');
+    storage = IoTimetableStorage(directoryProvider: () async => tempDir);
+  });
+
+  tearDown(() async {
+    if (await tempDir.exists()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  AppData buildGeneralData(String title) {
+    final empty = AppData.fromJson(const {});
+    const scheduleId = 'cal';
+    return AppData(
+      generalMode: GeneralScheduleData(
+        activeScheduleId: scheduleId,
+        schedules: [
+          GeneralSchedule(
+            id: scheduleId,
+            name: 'Calendar',
+            events: [
+              GeneralEvent(
+                id: 'event',
+                calendarId: scheduleId,
+                title: title,
+                startDateTimeIso: '2026-05-25T09:00:00.000',
+                endDateTimeIso: '2026-05-25T10:00:00.000',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  File mainFile() =>
+      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json');
+  File backupFile() =>
+      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json.bak');
+  File tempFile() =>
+      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json.tmp');
+
+  group('IoTimetableStorage atomic write & recovery', () {
+    test('first load returns null with status none', () async {
+      final result = await storage.load();
+
+      expect(result.data, isNull);
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+    });
+
+    test('write then read returns identical AppData', () async {
+      final data = buildGeneralData('student-data');
+
+      await storage.save(data);
+      final result = await storage.load();
+
+      expect(result.data, isNotNull);
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('student-data'));
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+    });
+
+    test('second write rotates previous main to .bak', () async {
+      final v1 = buildGeneralData('student-data');
+      final v2 = buildGeneralData('general-data');
+
+      await storage.save(v1);
+      await storage.save(v2);
+
+      // Main now has v2.
+      final result = await storage.load();
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('general-data'));
+
+      // .bak should contain the previous version (v1 == student mode).
+      expect(await backupFile().exists(), isTrue);
+      final bakContent = await backupFile().readAsString();
+      final bakData = AppData.decode(bakContent);
+      expect(bakData.generalMode.schedules.first.events.first.title, equals('student-data'));
+    });
+
+    test('successful save leaves no stale .tmp file', () async {
+      final data = buildGeneralData('general-data');
+
+      await storage.save(data);
+
+      expect(await tempFile().exists(), isFalse);
+    });
+
+    test('promotes valid .tmp when save crashed before rotation', () async {
+      final mainData = buildGeneralData('student-data');
+      final tempData = buildGeneralData('general-data');
+      await mainFile().writeAsString(mainData.encode());
+      await tempFile().writeAsString(tempData.encode());
+
+      final result = await storage.load();
+
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('general-data'));
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+      expect(await tempFile().exists(), isFalse);
+      expect(
+        AppData.decode(await mainFile().readAsString()).generalMode.schedules.first.events.first.title,
+        equals('general-data'),
+      );
+      expect(
+        AppData.decode(await backupFile().readAsString()).generalMode.schedules.first.events.first.title,
+        equals('student-data'),
+      );
+    });
+
+    test('promotes valid .tmp when save crashed after main rotation', () async {
+      final backupData = buildGeneralData('student-data');
+      final tempData = buildGeneralData('general-data');
+      await backupFile().writeAsString(backupData.encode());
+      await tempFile().writeAsString(tempData.encode());
+
+      final result = await storage.load();
+
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('general-data'));
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+      expect(await tempFile().exists(), isFalse);
+      expect(
+        AppData.decode(await mainFile().readAsString()).generalMode.schedules.first.events.first.title,
+        equals('general-data'),
+      );
+      expect(
+        AppData.decode(await backupFile().readAsString()).generalMode.schedules.first.events.first.title,
+        equals('student-data'),
+      );
+    });
+
+    test('falls back to .bak when main file is corrupted', () async {
+      final v1 = buildGeneralData('student-data');
+      final v2 = buildGeneralData('general-data');
+
+      // Two writes: main = v2, .bak = v1.
+      await storage.save(v1);
+      await storage.save(v2);
+
+      // Corrupt main file by writing invalid JSON.
+      await mainFile().writeAsString('{not valid json');
+
+      final result = await storage.load();
+
+      expect(result.data, isNotNull);
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('student-data'));
+      expect(result.recoveryStatus, equals(RecoveryStatus.restoredFromBackup));
+
+      final secondLoad = await storage.load();
+      expect(secondLoad.data, isNotNull);
+      expect(secondLoad.data!.generalMode.schedules.first.events.first.title, equals('student-data'));
+      expect(secondLoad.recoveryStatus, equals(RecoveryStatus.none));
+    });
+
+    test('falls back to .bak when main file is not valid UTF-8', () async {
+      final v1 = buildGeneralData('student-data');
+      final v2 = buildGeneralData('general-data');
+
+      await storage.save(v1);
+      await storage.save(v2);
+
+      await mainFile().writeAsBytes([0xff, 0xfe, 0xfd]);
+
+      final result = await storage.load();
+
+      expect(result.data, isNotNull);
+      expect(result.data!.generalMode.schedules.first.events.first.title, equals('student-data'));
+      expect(result.recoveryStatus, equals(RecoveryStatus.restoredFromBackup));
+    });
+
+    test(
+      'falls back to .bak when main file has malformed generalMode shape',
+      () async {
+        final backupData = buildGeneralData('Recovered from backup');
+        await backupFile().writeAsString(backupData.encode());
+        await mainFile().writeAsString('{"generalMode":"bad"}');
+
+        final result = await storage.load();
+
+        expect(
+          result.recoveryStatus,
+          equals(RecoveryStatus.restoredFromBackup),
+        );
+        expect(
+          result.data!.generalMode.schedules.single.events.single.title,
+          'Recovered from backup',
+        );
+      },
+    );
+
+    test(
+      'falls back to .bak when main file has malformed general schedules',
+      () async {
+        final backupData = buildGeneralData('Recovered schedule');
+        await backupFile().writeAsString(backupData.encode());
+        await mainFile().writeAsString(
+          '{"generalMode":{"schemaVersion":3,"schedules":["bad"]}}',
+        );
+
+        final result = await storage.load();
+
+        expect(
+          result.recoveryStatus,
+          equals(RecoveryStatus.restoredFromBackup),
+        );
+        expect(
+          result.data!.generalMode.schedules.single.events.single.title,
+          'Recovered schedule',
+        );
+      },
+    );
+
+    test(
+      'falls back to .bak when main file has mixed malformed schedules',
+      () async {
+        final backupData = buildGeneralData('Recovered mixed schedule');
+        final mainData = buildGeneralData('Corrupt mixed schedule').toJson();
+        final generalMode = Map<String, dynamic>.from(
+          mainData['generalMode'] as Map,
+        );
+        generalMode['schedules'] = [
+          ...(generalMode['schedules'] as List),
+          'bad',
+        ];
+        mainData['generalMode'] = generalMode;
+        await backupFile().writeAsString(backupData.encode());
+        await mainFile().writeAsString(jsonEncode(mainData));
+
+        final result = await storage.load();
+
+        expect(
+          result.recoveryStatus,
+          equals(RecoveryStatus.restoredFromBackup),
+        );
+        expect(
+          result.data!.generalMode.schedules.single.events.single.title,
+          'Recovered mixed schedule',
+        );
+      },
+    );
+
+    test(
+      'falls back to .bak when main file has invalid general event dates',
+      () async {
+        final backupData = buildGeneralData('Recovered event date');
+        final mainData = buildGeneralData('Corrupt event date').toJson();
+        final generalMode = Map<String, dynamic>.from(
+          mainData['generalMode'] as Map,
+        );
+        final schedules = [
+          for (final schedule in generalMode['schedules'] as List)
+            Map<String, dynamic>.from(schedule as Map),
+        ];
+        final events = [
+          for (final event in schedules.single['events'] as List)
+            Map<String, dynamic>.from(event as Map),
+        ];
+        events.single['start'] = '2026-02-31T09:00:00.000';
+        schedules.single['events'] = events;
+        generalMode['schedules'] = schedules;
+        mainData['generalMode'] = generalMode;
+        await backupFile().writeAsString(backupData.encode());
+        await mainFile().writeAsString(jsonEncode(mainData));
+
+        final result = await storage.load();
+
+        expect(
+          result.recoveryStatus,
+          equals(RecoveryStatus.restoredFromBackup),
+        );
+        expect(
+          result.data!.generalMode.schedules.single.events.single.title,
+          'Recovered event date',
+        );
+      },
+    );
+
+    test(
+      'returns failedBackupRestore when both main and .bak are corrupted',
+      () async {
+        await mainFile().writeAsString('{garbage');
+        await backupFile().writeAsString('{also garbage');
+
+        final result = await storage.load();
+
+        expect(result.data, isNull);
+        expect(
+          result.recoveryStatus,
+          equals(RecoveryStatus.failedBackupRestore),
+        );
+      },
+    );
+
+    test('empty main file is treated as missing (not corrupt)', () async {
+      await mainFile().writeAsString('   ');
+
+      final result = await storage.load();
+
+      expect(result.data, isNull);
+      // Empty is "no data yet", not a corruption event.
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+    });
+
+    test('stale .tmp file from previous crash is ignored on load', () async {
+      // Simulate: a previous save crashed after writing .tmp but before rotation.
+      await tempFile().writeAsString('{leftover');
+
+      final result = await storage.load();
+
+      expect(result.data, isNull);
+      expect(result.recoveryStatus, equals(RecoveryStatus.none));
+    });
+  });
+}

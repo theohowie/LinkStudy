@@ -1,0 +1,191 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+
+import '../models/app_data.dart';
+import 'timetable_storage.dart';
+
+TimetableStorage createTimetableStorage() => IoTimetableStorage();
+
+/// IO 平台继续落真实文件，用户自己备份或者排查数据时都更直观。
+///
+/// 写入策略（原子写 + 旋转 .bak）：
+/// 1. 先把新内容写到 `Sked_data.json.tmp` 并 flush。
+/// 2. 如果 `Sked_data.json` 存在，先把它重命名为 `Sked_data.json.bak`
+///    （已有的 .bak 会被覆盖，只保留最近一份）。
+/// 3. 把 `.tmp` 重命名为 `Sked_data.json`。
+///
+/// 加载策略：先尝试主文件；解析失败或主文件缺失则尝试 `.bak`；都失败则上报
+/// [RecoveryStatus.failedBackupRestore]。
+class IoTimetableStorage implements TimetableStorage {
+  IoTimetableStorage({Future<Directory> Function()? directoryProvider})
+    : _directoryProvider =
+          directoryProvider ?? getApplicationDocumentsDirectory;
+
+  static const _fileName = 'Sked_data.json';
+  static const _backupSuffix = '.bak';
+  static const _tempSuffix = '.tmp';
+
+  final Future<Directory> Function() _directoryProvider;
+
+  @override
+  Future<StorageLoadResult> load() async {
+    final main = await _resolveFile();
+    final tmp = File('${main.path}$_tempSuffix');
+    final backup = File('${main.path}$_backupSuffix');
+
+    final tmpAttempt = await _tryDecode(tmp);
+    if (tmpAttempt.outcome == _Outcome.success) {
+      try {
+        await _promoteTempToMain(tmp: tmp, main: main, backup: backup);
+      } catch (_) {
+        // The decoded temp snapshot is still usable even if promotion has to
+        // wait for the next successful save.
+      }
+      return StorageLoadResult(
+        data: tmpAttempt.data,
+        recoveryStatus: RecoveryStatus.none,
+      );
+    }
+
+    final mainAttempt = await _tryDecode(main);
+    if (mainAttempt.outcome == _Outcome.success) {
+      return StorageLoadResult(
+        data: mainAttempt.data,
+        recoveryStatus: RecoveryStatus.none,
+      );
+    }
+
+    // 主文件不存在 / 空内容：如果 .bak 也没有，就当首次启动；若 .bak 有，
+    // 说明上次写入崩在 rename 之间，用 .bak 恢复。
+    final backupAttempt = await _tryDecode(backup);
+    if (mainAttempt.outcome == _Outcome.missing &&
+        backupAttempt.outcome == _Outcome.missing) {
+      return const StorageLoadResult.empty();
+    }
+
+    if (backupAttempt.outcome == _Outcome.success) {
+      try {
+        await _restoreBackupToMain(backup: backup, main: main);
+      } catch (_) {
+        // Recovery should still succeed even if the best-effort promotion
+        // cannot rewrite the main file on this run.
+      }
+      return StorageLoadResult(
+        data: backupAttempt.data,
+        recoveryStatus: RecoveryStatus.restoredFromBackup,
+      );
+    }
+
+    // 主文件存在但损坏 / .bak 不存在或损坏：无法恢复任何数据。
+    if (mainAttempt.outcome == _Outcome.corrupt ||
+        backupAttempt.outcome == _Outcome.corrupt) {
+      return const StorageLoadResult(
+        data: null,
+        recoveryStatus: RecoveryStatus.failedBackupRestore,
+      );
+    }
+
+    // 兜底：主文件缺失 + .bak 缺失已经在上面拦截，这里走不到。
+    return const StorageLoadResult.empty();
+  }
+
+  @override
+  Future<void> save(AppData data) async {
+    final main = await _resolveFile();
+    final tmp = File('${main.path}$_tempSuffix');
+    final backup = File('${main.path}$_backupSuffix');
+
+    // 1. 写入 .tmp 并 flush，确保数据真的落盘。
+    final raf = await tmp.open(mode: FileMode.write);
+    try {
+      await raf.writeString(data.encode());
+      await raf.flush();
+    } finally {
+      await raf.close();
+    }
+
+    // 2. 旋转：把现有主文件移到 .bak（覆盖旧 .bak），再把 .tmp 升为主文件。
+    if (await main.exists()) {
+      if (await backup.exists()) {
+        await backup.delete();
+      }
+      await main.rename(backup.path);
+    }
+    await tmp.rename(main.path);
+  }
+
+  @override
+  Future<String> filePath() async {
+    final file = await _resolveFile();
+    return file.path;
+  }
+
+  Future<File> _resolveFile() async {
+    final directory = await _directoryProvider();
+    final filePath = path.join(directory.path, _fileName);
+    return File(filePath);
+  }
+
+  Future<void> _promoteTempToMain({
+    required File tmp,
+    required File main,
+    required File backup,
+  }) async {
+    if (!await main.exists()) {
+      await tmp.rename(main.path);
+      return;
+    }
+    final mainAttempt = await _tryDecode(main);
+    if (mainAttempt.outcome == _Outcome.success) {
+      if (await backup.exists()) {
+        await backup.delete();
+      }
+      await main.rename(backup.path);
+    } else {
+      await main.delete();
+    }
+    await tmp.rename(main.path);
+  }
+
+  Future<void> _restoreBackupToMain({
+    required File backup,
+    required File main,
+  }) async {
+    final tmp = File('${main.path}$_tempSuffix');
+    if (await tmp.exists()) {
+      await tmp.delete();
+    }
+    await backup.copy(tmp.path);
+    if (await main.exists()) {
+      await main.delete();
+    }
+    await tmp.rename(main.path);
+  }
+
+  Future<_DecodeAttempt> _tryDecode(File file) async {
+    try {
+      if (!await file.exists()) {
+        return const _DecodeAttempt(_Outcome.missing, null);
+      }
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        return const _DecodeAttempt(_Outcome.missing, null);
+      }
+      final data = AppData.decodeStorageSnapshot(content);
+      return _DecodeAttempt(_Outcome.success, data);
+    } catch (_) {
+      return const _DecodeAttempt(_Outcome.corrupt, null);
+    }
+  }
+}
+
+enum _Outcome { success, missing, corrupt }
+
+class _DecodeAttempt {
+  const _DecodeAttempt(this.outcome, this.data);
+
+  final _Outcome outcome;
+  final AppData? data;
+}

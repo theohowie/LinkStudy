@@ -1,0 +1,54 @@
+name: linkstudy
+description: "A local-first timetable and schedule management app."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  provider: ^6.1.5
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.3
+
+  cupertino_icons: ^1.0.8
+  file_selector: ^1.1.0
+  share_plus: ^13.1.0
+  url_launcher: ^6.3.2
+  font_awesome_flutter: ^11.0.0
+  http: ^1.5.0
+  crypto: ^3.0.6
+  package_info_plus: ^10.1.0
+  flutter_inappwebview: ^6.1.5
+  flutter_colorpicker: ^1.1.0
+  lunar: ^1.7.8
+  flutter_secure_storage: ^10.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  generate: true
+
+  uses-material-design: true
+
+  assets:
+    - assets/default_period_times.json
+    - assets/school_sites.json
+    - NOTICE
+
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/sked.png"
+  adaptive_icon_foreground: "assets/sked_0.png"
+  adaptive_icon_background: "#FFFFFF"

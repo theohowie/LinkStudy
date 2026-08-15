@@ -1,0 +1,1989 @@
+import '../models/app_data.dart';
+import '../models/general_models.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/text_transfer_widgets.dart';
+import '../data/timetable_storage.dart';
+import '../l10n/app_locale.dart';
+import '../l10n/app_localizations.dart';
+import '../platform/overlay_client.dart';
+import '../providers/timetable_provider.dart';
+import '../services/export_service.dart';
+import '../services/general_calendar_ics_service.dart';
+import '../services/import_export_service.dart';
+import '../services/text_file_picker.dart';
+import '../services/update_service.dart';
+import '../widgets/app_modal_sheet.dart';
+import '../widgets/expressive_dialog.dart';
+import '../widgets/expressive_motion.dart';
+import '../widgets/settings_list.dart';
+import 'general_display_settings_page.dart';
+import 'language_settings_page.dart';
+import 'overlay_settings_page.dart';
+import 'theme_settings_page.dart';
+
+enum _GeneralDataAction {
+  importSchedulesJsonFile,
+  importSchedulesJsonText,
+  importSchedulesIcsFile,
+  importSchedulesIcsText,
+  exportSchedulesJsonShare,
+  exportSchedulesJsonSave,
+  exportSchedulesJsonText,
+  exportSchedulesIcsShare,
+  exportSchedulesIcsSave,
+  exportSchedulesIcsText,
+}
+
+enum _AppDataAction {
+  restoreBackupFile,
+  restoreBackupText,
+  shareBackupFile,
+  saveBackupFile,
+  copyBackupText,
+}
+
+enum _ExportFormat { json, ics }
+
+enum _SettingsFlow {
+  themeSettingsPage,
+  generalDisplaySettingsPage,
+  languageSettingsPage,
+  generalDataActions,
+  appDataActions,
+  overlaySettings,
+  privacyPolicy,
+  licensesPage,
+  updateCheck,
+  githubRepo,
+}
+
+enum UpdateCheckSource { manual, startup }
+
+enum _UpdateAction { github, ignore, cancel }
+
+class AppUpdateCoordinator {
+  static const _updateService = UpdateService();
+
+  static Future<void> checkForUpdates(
+    BuildContext context, {
+    required TimetableProvider provider,
+    required UpdateCheckSource source,
+    UpdateService updateService = _updateService,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final showIgnoreButton = source == UpdateCheckSource.startup;
+    try {
+      final result = await updateService.checkForUpdates();
+      if (!context.mounted) {
+        return;
+      }
+      final latestMessage = l10n.alreadyLatestVersion(result.localVersion);
+      if (!result.hasUpdate) {
+        await provider.updateAvailableUpdateVersion(null);
+        if (!context.mounted) {
+          return;
+        }
+        if (source == UpdateCheckSource.manual) {
+          _showMessage(context, latestMessage);
+        }
+        return;
+      }
+      await provider.updateAvailableUpdateVersion(result.remoteVersion);
+      if (!context.mounted) {
+        return;
+      }
+      if (showIgnoreButton &&
+          provider.ignoredUpdateVersion == result.remoteVersion) {
+        return;
+      }
+      final action = await _showUpdateDialog(
+        context,
+        result,
+        showIgnoreButton: showIgnoreButton,
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await _handleUpdateAction(
+        context,
+        provider: provider,
+        action: action,
+        showIgnoreButton: showIgnoreButton,
+        remoteVersion: result.remoteVersion,
+        releaseUrl: result.releaseUrl,
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      final action = await _showUpdateCheckFailedDialog(
+        context,
+        showIgnoreButton: showIgnoreButton,
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await _handleUpdateAction(
+        context,
+        provider: provider,
+        action: action,
+        showIgnoreButton: showIgnoreButton,
+        releaseUrl: UpdateService.latestReleaseUrl,
+      );
+    }
+  }
+
+  static Future<_UpdateAction?> _showUpdateDialog(
+    BuildContext context,
+    UpdateCheckResult result, {
+    required bool showIgnoreButton,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final updateContent = result.updateContent.trim();
+    return showExpressiveDialog<_UpdateAction>(
+      context: context,
+      builder: (context) {
+        var popped = false;
+        void popWith(_UpdateAction action) {
+          if (popped) return;
+          popped = true;
+          Navigator.of(context).pop(action);
+        }
+
+        return AlertDialog(
+          title: Text(l10n.checkForUpdates),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${l10n.currentVersionLabel} ${result.localVersion}'),
+                const SizedBox(height: 8),
+                Text('${l10n.latestVersionLabel} ${result.remoteVersion}'),
+                if (updateContent.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.updateContentLabel,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(updateContent),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _buildUpdateDialogActions(
+                context,
+                pop: popWith,
+                showIgnoreButton: showIgnoreButton,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static Future<_UpdateAction?> _showUpdateCheckFailedDialog(
+    BuildContext context, {
+    required bool showIgnoreButton,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    return showExpressiveDialog<_UpdateAction>(
+      context: context,
+      builder: (context) {
+        var popped = false;
+        void popWith(_UpdateAction action) {
+          if (popped) return;
+          popped = true;
+          Navigator.of(context).pop(action);
+        }
+
+        return AlertDialog(
+          title: Text(l10n.updateCheckFailedTitle),
+          content: Text(l10n.updateCheckFailedMessage),
+          actions: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _buildUpdateDialogActions(
+                context,
+                pop: popWith,
+                showIgnoreButton: showIgnoreButton,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static List<Widget> _buildUpdateDialogActions(
+    BuildContext context, {
+    required void Function(_UpdateAction action) pop,
+    required bool showIgnoreButton,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    return [
+      TextButton(
+        onPressed: () => pop(_UpdateAction.cancel),
+        child: Text(l10n.cancel),
+      ),
+      if (showIgnoreButton)
+        TextButton(
+          onPressed: () => pop(_UpdateAction.ignore),
+          child: Text(l10n.ignoreThisVersion),
+        ),
+      FilledButton(
+        onPressed: () => pop(_UpdateAction.github),
+        child: Text(l10n.githubRepository),
+      ),
+    ];
+  }
+
+  static Future<void> _handleUpdateAction(
+    BuildContext context, {
+    required TimetableProvider provider,
+    required _UpdateAction? action,
+    required bool showIgnoreButton,
+    String? remoteVersion,
+    String? releaseUrl,
+  }) async {
+    switch (action) {
+      case _UpdateAction.github:
+        await _openExternalPage(
+          context,
+          releaseUrl ?? UpdateService.latestReleaseUrl,
+        );
+        return;
+      case _UpdateAction.ignore:
+        if (showIgnoreButton &&
+            remoteVersion != null &&
+            remoteVersion.trim().isNotEmpty) {
+          await provider.ignoreUpdateVersion(remoteVersion);
+        }
+        return;
+      case _UpdateAction.cancel:
+      case null:
+        return;
+    }
+  }
+
+  static Future<void> _openExternalPage(
+    BuildContext context,
+    String url,
+  ) async {
+    final uri = Uri.parse(url);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      _showMessage(context, AppLocalizations.of(context).openUpdatesFailed);
+    }
+  }
+
+  static void _showMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  static const _exportService = ExportService();
+  static const _overlayEnabledKey = overlayPrefsEnabledKey;
+
+  String _currentVersion = '';
+  bool _overlayEnabled = false;
+  bool _overlayBusy = false;
+  String _overlayStyle = overlayStyleCapsuleBlack;
+  int _overlayOpacity = 100;
+  final Set<_SettingsFlow> _openFlows = <_SettingsFlow>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentVersion();
+    _loadOverlayState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TimetableProvider>(
+      builder: (context, provider, child) {
+        final l10n = AppLocalizations.of(context);
+        final languageOptions = supportedLanguageOptions(l10n);
+        final currentLanguageLabel = _languageLabelForCode(
+          languageOptions,
+          provider.localeCode,
+        );
+        return Scaffold(
+          appBar: AppBar(title: Text(l10n.settingsTitle)),
+          body: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              if (provider.lastRecoveryStatus != RecoveryStatus.none) ...[
+                _RecoveryNoticeTile(status: provider.lastRecoveryStatus),
+                const SizedBox(height: 8),
+              ],
+              SettingsSectionHeader(
+                title: l10n.settingsSectionGeneralSchedule,
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.grid_view_outlined),
+                title: l10n.generalDisplaySettings,
+                subtitle: l10n.generalDisplaySettingsDesc,
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.generalDisplaySettingsPage)
+                    ? null
+                    : () => _openGeneralDisplaySettingsPage(provider),
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.import_export),
+                title: l10n.generalScheduleImportExport,
+                subtitle: l10n.generalScheduleImportExportDesc,
+                trailing: const Icon(Icons.keyboard_arrow_up),
+                onTap: _isFlowOpen(_SettingsFlow.generalDataActions)
+                    ? null
+                    : () => _showGeneralDataActions(provider),
+              ),
+              SettingsSectionHeader(title: '悬浮窗'),
+              SettingsListTile(
+                leading: const Icon(Icons.picture_in_picture_alt_outlined),
+                title: '开启悬浮窗',
+                subtitle: _overlayEnabled
+                    ? '已启用：悬浮球可拖动，点击展开采集面板'
+                    : '在任意应用上方显示悬浮球，用于采集网课链接',
+                trailing: Switch(
+                  value: _overlayEnabled,
+                  onChanged: _overlayBusy ? null : _toggleOverlay,
+                ),
+                onTap: _overlayBusy
+                    ? null
+                    : () => _toggleOverlay(!_overlayEnabled),
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.circle_outlined),
+                title: '悬浮球样式',
+                subtitle: _overlayStyle == overlayStyleBallWhite
+                    ? '白色圆球 · 透明度 $_overlayOpacity%'
+                    : '黑色胶囊 · 透明度 $_overlayOpacity%',
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.overlaySettings)
+                    ? null
+                    : () => _openOverlaySettingsPage(),
+              ),
+              SettingsSectionHeader(title: l10n.settingsSectionAppearance),
+              SettingsListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: l10n.theme,
+                subtitle: _themeSettingsSummary(provider, l10n),
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.themeSettingsPage)
+                    ? null
+                    : () => _openThemeSettingsPage(provider),
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.translate_outlined),
+                title: l10n.language,
+                subtitle: currentLanguageLabel,
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.languageSettingsPage)
+                    ? null
+                    : () => _openLanguageSettingsPage(provider),
+              ),
+              SettingsSectionHeader(title: l10n.settingsSectionApp),
+              SettingsListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: l10n.appBackupTitle,
+                subtitle: l10n.appBackupSubtitle,
+                trailing: const Icon(Icons.keyboard_arrow_up),
+                onTap: _isFlowOpen(_SettingsFlow.appDataActions)
+                    ? null
+                    : () => _showAppDataActions(provider),
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: l10n.privacyPolicyTitle,
+                subtitle: provider.acceptedPrivacyPolicyVersion == null
+                    ? l10n.privacyPolicyEntryDesc
+                    : l10n.privacyPolicyAcceptedVersionLabel(
+                        provider.acceptedPrivacyPolicyVersion!,
+                      ),
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.privacyPolicy)
+                    ? null
+                    : _openPrivacyPolicyPage,
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: l10n.openSourceLicenses,
+                subtitle: l10n.openSourceLicensesDesc,
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.licensesPage)
+                    ? null
+                    : _openLicensesPage,
+              ),
+              SettingsListTile(
+                leading: const Icon(Icons.update_outlined),
+                title: l10n.checkForUpdates,
+                subtitle: _buildUpdateSubtitle(provider, l10n),
+                onTap: _isFlowOpen(_SettingsFlow.updateCheck)
+                    ? null
+                    : _checkForUpdates,
+              ),
+              SettingsListTile(
+                leading: const FaIcon(FontAwesomeIcons.github),
+                title: l10n.githubRepository,
+                subtitle: l10n.githubRepositoryUrl,
+                trailing: const Icon(Icons.open_in_new),
+                onTap: _isFlowOpen(_SettingsFlow.githubRepo)
+                    ? null
+                    : _openGithubRepo,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  bool _isFlowOpen(_SettingsFlow flow) => _openFlows.contains(flow);
+
+  String _themeSettingsSummary(
+    TimetableProvider provider,
+    AppLocalizations l10n,
+  ) {
+    final mode = switch (provider.themeMode) {
+      'dark' => l10n.themeDark,
+      'system' => l10n.themeFollowSystem,
+      _ => l10n.themeLight,
+    };
+    final colorMode = provider.themeColorMode == themeColorModeColorful
+        ? l10n.themeColorModeColorful
+        : l10n.themeColorModeSingle;
+    return '$mode / $colorMode';
+  }
+
+  void _setFlowOpen(_SettingsFlow flow, bool value) {
+    final changed = value ? _openFlows.add(flow) : _openFlows.remove(flow);
+    if (!changed) return;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadOverlayState() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _overlayEnabled = prefs.getBool(_overlayEnabledKey) ?? false;
+      _overlayStyle = prefs.getString(overlayPrefsStyleKey) ?? overlayStyleCapsuleBlack;
+      _overlayOpacity = prefs.getInt(overlayPrefsOpacityKey) ?? 100;
+    });
+  }
+
+  Future<void> _openOverlaySettingsPage() async {
+    await _guardFlow(_SettingsFlow.overlaySettings, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const OverlaySettingsPage(),
+        ),
+      );
+      // 返回后刷新样式/透明度摘要
+      await _loadOverlayState();
+    });
+  }
+
+  Future<void> _toggleOverlay(bool value) async {
+    if (_overlayBusy) return;
+    setState(() => _overlayBusy = true);
+    final client = OverlayClient();
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      if (value) {
+        final granted = await client.isPermissionGranted();
+        if (!granted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('需要"显示在其他应用上层"权限才能启用悬浮窗'),
+              ),
+            );
+          }
+          await client.openPermissionSettings();
+          return; // 保持关闭，等待用户授权后重新打开
+        }
+        await client.requestNotificationPermission();
+        await client.startOverlay();
+        await client.setOverlayStyle(_overlayStyle);
+        await client.setOverlayOpacity(_overlayOpacity);
+        await prefs.setBool(_overlayEnabledKey, true);
+        if (mounted) setState(() => _overlayEnabled = true);
+      } else {
+        await client.stopOverlay();
+        await prefs.setBool(_overlayEnabledKey, false);
+        if (mounted) setState(() => _overlayEnabled = false);
+      }
+    } catch (e) {
+      debugPrint('overlay toggle failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('悬浮窗操作失败，请重试')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _overlayBusy = false);
+    }
+  }
+
+  Future<void> _guardFlow(
+    _SettingsFlow flow,
+    Future<void> Function() action,
+  ) async {
+    if (_isFlowOpen(flow) || !mounted) {
+      return;
+    }
+    _setFlowOpen(flow, true);
+    try {
+      await action();
+    } finally {
+      _setFlowOpen(flow, false);
+    }
+  }
+
+  Future<void> _openThemeSettingsPage(TimetableProvider provider) async {
+    await _guardFlow(_SettingsFlow.themeSettingsPage, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider<TimetableProvider>.value(
+            value: provider,
+            child: const ThemeSettingsPage(),
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _openGeneralDisplaySettingsPage(
+    TimetableProvider provider,
+  ) async {
+    await _guardFlow(_SettingsFlow.generalDisplaySettingsPage, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider<TimetableProvider>.value(
+            value: provider,
+            child: const GeneralDisplaySettingsPage(),
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _openLanguageSettingsPage(TimetableProvider provider) async {
+    await _guardFlow(_SettingsFlow.languageSettingsPage, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider<TimetableProvider>.value(
+            value: provider,
+            child: const LanguageSettingsPage(),
+          ),
+        ),
+      );
+    });
+  }
+
+  String _languageLabelForCode(
+    List<AppLanguageOption> options,
+    String localeCode,
+  ) {
+    final normalizedCode = normalizeLocaleCode(localeCode);
+    for (final option in options) {
+      if (option.code == normalizedCode) {
+        return option.label;
+      }
+    }
+    return languageLabelForLocaleCode(
+      normalizedCode,
+      l10n: AppLocalizations.of(context),
+    );
+  }
+
+  Future<void> _openPrivacyPolicyPage() async {
+    await _guardFlow(_SettingsFlow.privacyPolicy, () async {
+      final uri = Uri.parse('https://sked.mashiro.tech/privacy.html');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    });
+  }
+
+  Future<void> _openLicensesPage() async {
+    await _guardFlow(_SettingsFlow.licensesPage, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const LicensePage(applicationName: 'LinkStudy'),
+        ),
+      );
+    });
+  }
+
+  String _buildUpdateSubtitle(
+    TimetableProvider provider,
+    AppLocalizations l10n,
+  ) {
+    final versionLabel = _currentVersion.isEmpty
+        ? l10n.currentVersionLabel
+        : '${l10n.currentVersionLabel} $_currentVersion';
+    final availableUpdateVersion = provider.availableUpdateVersion;
+    if (availableUpdateVersion == null ||
+        availableUpdateVersion.isEmpty ||
+        !_isNewerThanCurrentVersion(availableUpdateVersion)) {
+      return versionLabel;
+    }
+    return '$versionLabel · ${l10n.newVersionAvailable}';
+  }
+
+  String _backupFileName() => 'Sked_backup.json';
+
+  Future<void> _loadCurrentVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) {
+      return;
+    }
+    final currentVersion = info.version;
+    setState(() => _currentVersion = currentVersion);
+    final provider = context.read<TimetableProvider>();
+    final availableUpdateVersion = provider.availableUpdateVersion;
+    if (availableUpdateVersion == null || availableUpdateVersion.isEmpty) {
+      return;
+    }
+    int comparison;
+    try {
+      comparison = compareUpdateVersions(
+        availableUpdateVersion,
+        currentVersion,
+      );
+    } on FormatException catch (error) {
+      assert(() {
+        debugPrint(
+          'Clearing malformed available update version '
+          '"$availableUpdateVersion": $error',
+        );
+        return true;
+      }());
+      await provider.updateAvailableUpdateVersion(null);
+      return;
+    }
+    if (comparison <= 0) {
+      await provider.updateAvailableUpdateVersion(null);
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    await _guardFlow(_SettingsFlow.updateCheck, () async {
+      await AppUpdateCoordinator.checkForUpdates(
+        context,
+        provider: context.read<TimetableProvider>(),
+        source: UpdateCheckSource.manual,
+      );
+    });
+  }
+
+  bool _isNewerThanCurrentVersion(String version) {
+    if (_currentVersion.isEmpty) {
+      return true;
+    }
+    try {
+      return compareUpdateVersions(version, _currentVersion) > 0;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  Future<void> _openGithubRepo() async {
+    await _guardFlow(_SettingsFlow.githubRepo, () async {
+      final uri = Uri.parse('https://github.com/theohowie/linkstudy');
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        _showMessage(AppLocalizations.of(context).openGithubFailed);
+      }
+    });
+  }
+
+  Future<void> _showAppDataActions(TimetableProvider provider) async {
+    await _guardFlow(_SettingsFlow.appDataActions, () async {
+      final action = await showAppModalSheet<_AppDataAction>(
+        context: context,
+        maxWidth: appSheetWidthMedium,
+        builder: (sheetContext) {
+          final l10n = AppLocalizations.of(sheetContext);
+          final maxHeight = MediaQuery.of(sheetContext).size.height * 0.85;
+          var popped = false;
+          void popWith(_AppDataAction action) {
+            if (popped) return;
+            popped = true;
+            Navigator.of(sheetContext).pop(action);
+          }
+
+          return SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                children: [
+                  _ActionSheetHeader(
+                    icon: Icons.inventory_2_outlined,
+                    title: l10n.appBackupTitle,
+                    subtitle: l10n.appBackupSheetSubtitle,
+                  ),
+                  const SizedBox(height: 12),
+                  _ActionSheetGroup(
+                    children: [
+                      _ActionSheetTile(
+                        icon: Icons.restore_page_outlined,
+                        title: l10n.restoreBackupFileTitle,
+                        subtitle: l10n.restoreBackupFileSubtitle,
+                        onTap: () => popWith(_AppDataAction.restoreBackupFile),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.content_paste_go_outlined,
+                        title: l10n.restoreBackupTextTitle,
+                        subtitle: l10n.restoreBackupTextSubtitle,
+                        onTap: () => popWith(_AppDataAction.restoreBackupText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _ActionSheetGroup(
+                    children: [
+                      _ActionSheetTile(
+                        icon: Icons.share_outlined,
+                        title: l10n.shareBackupTitle,
+                        subtitle: l10n.shareBackupSubtitle,
+                        onTap: () => popWith(_AppDataAction.shareBackupFile),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.save_alt_outlined,
+                        title: l10n.saveBackupTitle,
+                        subtitle: l10n.saveBackupSubtitle,
+                        onTap: () => popWith(_AppDataAction.saveBackupFile),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.text_snippet_outlined,
+                        title: l10n.copyBackupTitle,
+                        subtitle: l10n.copyBackupSubtitle,
+                        onTap: () => popWith(_AppDataAction.copyBackupText),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (action == null || !mounted) return;
+      switch (action) {
+        case _AppDataAction.restoreBackupFile:
+          await _restoreAppDataFromFile(provider);
+        case _AppDataAction.restoreBackupText:
+          await _restoreAppDataFromText(provider);
+        case _AppDataAction.shareBackupFile:
+          await _exportAppDataBackup(provider, share: true);
+        case _AppDataAction.saveBackupFile:
+          await _exportAppDataBackup(provider, share: false);
+        case _AppDataAction.copyBackupText:
+          await _exportAppDataBackupAsText(provider);
+      }
+    });
+  }
+
+  Future<void> _restoreAppDataFromFile(TimetableProvider provider) async {
+    final source = await _pickTextFile(allowedExtensions: const ['json']);
+    if (source == null || !mounted) return;
+    await _restoreAppDataSource(provider, source, context);
+  }
+
+  Future<void> _restoreAppDataFromText(TimetableProvider provider) async {
+    final l10n = AppLocalizations.of(context);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextImportPage(
+          title: l10n.restoreBackupTextTitle,
+          submitText: l10n.restoreBackupConfirmAction,
+          onSubmit: (context, content) {
+            return _restoreAppDataSource(provider, content, context);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _restoreAppDataSource(
+    TimetableProvider provider,
+    String source,
+    BuildContext feedbackContext,
+  ) async {
+    final confirmed = await showExpressiveDialog<bool>(
+      context: feedbackContext,
+      builder: (dialogContext) {
+        var popped = false;
+        void popWith(bool value) {
+          if (popped) return;
+          popped = true;
+          Navigator.of(dialogContext).pop(value);
+        }
+
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: Text(l10n.restoreBackupConfirmTitle),
+          content: Text(l10n.restoreBackupConfirmMessage),
+          actions: [
+            TextButton(
+              onPressed: () => popWith(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => popWith(true),
+              child: Text(l10n.restoreBackupConfirmAction),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !feedbackContext.mounted) return false;
+    final l10n = AppLocalizations.of(feedbackContext);
+    final successMessage = l10n.restoreBackupSuccessMessage;
+    final failureMessage = l10n.restoreBackupFailureMessage;
+    try {
+      await provider.importAppDataJson(source, mode: AppImportMode.replaceAll);
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(
+          feedbackContext,
+        ).showSnackBar(SnackBar(content: Text(successMessage)));
+      }
+      return true;
+    } on FormatException catch (error) {
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(
+          feedbackContext,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return false;
+    } catch (_) {
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(
+          feedbackContext,
+        ).showSnackBar(SnackBar(content: Text(failureMessage)));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _exportAppDataBackup(
+    TimetableProvider provider, {
+    required bool share,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final content = provider.exportAppDataJson();
+      final fileName = _backupFileName();
+      if (share) {
+        await _shareJson(fileName, content);
+      } else {
+        await _saveJsonToFile(fileName, content);
+      }
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.saveFailedRetry);
+    }
+  }
+
+  Future<void> _exportAppDataBackupAsText(TimetableProvider provider) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final content = provider.exportAppDataJson();
+      await showTextExportDialog(
+        context,
+        title: l10n.copyBackupTitle,
+        content: content,
+      );
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.saveFailedRetry);
+    }
+  }
+
+  Future<void> _shareJson(String fileName, String content) async {
+    await _shareFile(ExportPayload(fileName: fileName, content: content));
+  }
+
+  Future<void> _shareFile(ExportPayload payload) async {
+    await _exportService.shareFile(payload);
+  }
+
+  Future<void> _saveJsonToFile(String fileName, String content) async {
+    await _saveFileToDisk(ExportPayload(fileName: fileName, content: content));
+  }
+
+  Future<void> _saveFileToDisk(ExportPayload payload) async {
+    final l10n = AppLocalizations.of(context);
+    final result = await _exportService.saveFile(payload);
+    if (!mounted) {
+      return;
+    }
+
+    switch (result.status) {
+      case ExportSaveStatus.saved:
+        _showMessage(l10n.savedToPath(result.path ?? payload.fileName));
+        return;
+      case ExportSaveStatus.cancelled:
+        _showMessage(l10n.saveCancelled);
+        return;
+      case ExportSaveStatus.permissionDenied:
+        final retry = await _showPermissionDialog(
+          title: l10n.fileSaveRestrictedTitle,
+          message: l10n.fileSaveRestrictedRetryMessage,
+          confirmText: l10n.retrySave,
+        );
+        if (retry == true && mounted) {
+          await _saveFileToDisk(payload);
+        }
+        return;
+      case ExportSaveStatus.permissionPermanentlyDenied:
+        final openSettings = await _showPermissionDialog(
+          title: l10n.fileSaveRestrictedTitle,
+          message: l10n.fileSaveRestrictedSettingsMessage,
+          confirmText: l10n.openSettings,
+        );
+        if (openSettings == true) {
+          await _exportService.openSettings();
+        }
+        return;
+      case ExportSaveStatus.unsupported:
+        final shouldShare = await _showFailureDialog(
+          title: l10n.browserDownloadRestrictedTitle,
+          message: l10n.browserDownloadRestrictedMessage,
+        );
+        if (shouldShare == true) {
+          await _shareFile(payload);
+          if (mounted) {
+            _showMessage(l10n.exportSwitchedToShare);
+          }
+        }
+        return;
+      case ExportSaveStatus.failed:
+        final shouldShare = await _showFailureDialog(
+          title: _exportService.usesDesktopFileSaveErrors
+              ? l10n.fileSaveFailedTitle
+              : l10n.fileSaveRestrictedTitle,
+          message: _exportService.usesDesktopFileSaveErrors
+              ? l10n.fileSaveFailedWindowsMessage
+              : l10n.fileSaveFailedGenericMessage,
+        );
+        if (shouldShare == true) {
+          await _shareFile(payload);
+          if (mounted) {
+            _showMessage(l10n.exportSwitchedToShare);
+          }
+        } else if (mounted) {
+          _showMessage(l10n.saveFailedRetry);
+        }
+        return;
+    }
+  }
+
+  Future<bool?> _showPermissionDialog({
+    required String title,
+    required String message,
+    required String confirmText,
+  }) {
+    return showExpressiveDialog<bool>(
+      context: context,
+      builder: (context) {
+        var popped = false;
+        void popWith(bool value) {
+          if (popped) return;
+          popped = true;
+          Navigator.of(context).pop(value);
+        }
+
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => popWith(false),
+              child: Text(AppLocalizations.of(context).cancel),
+            ),
+            FilledButton(
+              onPressed: () => popWith(true),
+              child: Text(confirmText),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<bool?> _showFailureDialog({
+    required String title,
+    required String message,
+  }) {
+    return showExpressiveDialog<bool>(
+      context: context,
+      builder: (context) {
+        var popped = false;
+        void popWith(bool value) {
+          if (popped) return;
+          popped = true;
+          Navigator.of(context).pop(value);
+        }
+
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => popWith(false),
+              child: Text(AppLocalizations.of(context).retryLater),
+            ),
+            FilledButton(
+              onPressed: () => popWith(true),
+              child: Text(AppLocalizations.of(context).switchToShare),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showGeneralDataActions(TimetableProvider provider) async {
+    await _guardFlow(_SettingsFlow.generalDataActions, () async {
+      final action = await showAppModalSheet<_GeneralDataAction>(
+        context: context,
+        maxWidth: appSheetWidthMedium,
+        builder: (sheetContext) {
+          final maxHeight = MediaQuery.of(sheetContext).size.height * 0.85;
+          final l10n = AppLocalizations.of(sheetContext);
+          var popped = false;
+          void popWith(_GeneralDataAction action) {
+            if (popped) return;
+            popped = true;
+            Navigator.of(sheetContext).pop(action);
+          }
+
+          return SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                children: [
+                  _ActionSheetHeader(
+                    icon: Icons.event_note_outlined,
+                    title: l10n.generalScheduleImportExport,
+                    subtitle: l10n.generalScheduleImportExportDesc,
+                  ),
+                  const SizedBox(height: 12),
+                  _ActionSheetGroup(
+                    children: [
+                      _ActionSheetTile(
+                        icon: Icons.file_download_outlined,
+                        title: l10n.importJsonFile,
+                        subtitle: l10n.importGeneralSchedulesDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.importSchedulesJsonFile),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.paste_outlined,
+                        title: l10n.pasteJson,
+                        subtitle: l10n.importGeneralSchedulesJsonTextDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.importSchedulesJsonText),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.calendar_month_outlined,
+                        title: l10n.importIcsFile,
+                        subtitle: l10n.importIcsFileDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.importSchedulesIcsFile),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.event_note_outlined,
+                        title: l10n.pasteIcs,
+                        subtitle: l10n.pasteIcsDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.importSchedulesIcsText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _ActionSheetGroup(
+                    children: [
+                      _ActionSheetTile(
+                        icon: Icons.share_outlined,
+                        title: '${l10n.shareGeneralSchedules} JSON',
+                        subtitle: l10n.shareGeneralSchedulesDesc,
+                        onTap: () => popWith(
+                          _GeneralDataAction.exportSchedulesJsonShare,
+                        ),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.save_alt_outlined,
+                        title: '${l10n.saveGeneralSchedules} JSON',
+                        subtitle: l10n.saveGeneralSchedulesDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.exportSchedulesJsonSave),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.text_snippet_outlined,
+                        title: l10n.copyJson,
+                        subtitle: l10n.copyJsonDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.exportSchedulesJsonText),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.ios_share_outlined,
+                        title: l10n.shareIcs,
+                        subtitle: l10n.shareIcsDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.exportSchedulesIcsShare),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.event_available_outlined,
+                        title: l10n.saveIcs,
+                        subtitle: l10n.saveIcsDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.exportSchedulesIcsSave),
+                      ),
+                      _ActionSheetTile(
+                        icon: Icons.event_note_outlined,
+                        title: l10n.copyIcs,
+                        subtitle: l10n.copyIcsDesc,
+                        onTap: () =>
+                            popWith(_GeneralDataAction.exportSchedulesIcsText),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (action == null || !mounted) return;
+      switch (action) {
+        case _GeneralDataAction.importSchedulesJsonFile:
+          await _importGeneralSchedulesJsonFile(provider);
+        case _GeneralDataAction.importSchedulesJsonText:
+          await _importGeneralSchedulesJsonText(provider);
+        case _GeneralDataAction.importSchedulesIcsFile:
+          await _importGeneralSchedulesIcsFile(provider);
+        case _GeneralDataAction.importSchedulesIcsText:
+          await _importGeneralSchedulesIcsText(provider);
+        case _GeneralDataAction.exportSchedulesJsonShare:
+          await _exportGeneralSchedules(provider, share: true);
+        case _GeneralDataAction.exportSchedulesJsonSave:
+          await _exportGeneralSchedules(provider, share: false);
+        case _GeneralDataAction.exportSchedulesJsonText:
+          await _exportGeneralSchedulesAsText(
+            provider,
+            format: _ExportFormat.json,
+          );
+        case _GeneralDataAction.exportSchedulesIcsShare:
+          await _exportGeneralSchedulesIcs(provider, share: true);
+        case _GeneralDataAction.exportSchedulesIcsSave:
+          await _exportGeneralSchedulesIcs(provider, share: false);
+        case _GeneralDataAction.exportSchedulesIcsText:
+          await _exportGeneralSchedulesAsText(
+            provider,
+            format: _ExportFormat.ics,
+          );
+      }
+    });
+  }
+
+  Future<List<String>?> _pickGeneralScheduleIds({
+    required List<GeneralSchedule> schedules,
+    required String title,
+    required String confirmText,
+    List<String> initialSelectedIds = const [],
+  }) {
+    final draft = <String>{
+      ...initialSelectedIds.where((id) => schedules.any((s) => s.id == id)),
+    };
+    if (draft.isEmpty && schedules.isNotEmpty) {
+      draft.add(schedules.first.id);
+    }
+    return showExpressiveDialog<List<String>>(
+      context: context,
+      builder: (context) {
+        var popped = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final l10n = AppLocalizations.of(context);
+            void popWith(List<String>? value) {
+              if (popped) return;
+              popped = true;
+              Navigator.of(context).pop(value);
+            }
+
+            return AlertDialog(
+              title: Text(title),
+              content: ExpressiveDialogContent(
+                maxWidth: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SelectionToolbar(
+                      selectedCount: draft.length,
+                      totalCount: schedules.length,
+                      onSelectAll: () => setState(() {
+                        draft
+                          ..clear()
+                          ..addAll(schedules.map((s) => s.id));
+                      }),
+                      onClear: () => setState(draft.clear),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: schedules.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final schedule = schedules[index];
+                          final selected = draft.contains(schedule.id);
+                          return _SelectableExportTile(
+                            selected: selected,
+                            leading: const Icon(Icons.event_note_outlined),
+                            title: Text(schedule.name),
+                            subtitle: Text(
+                              l10n.generalScheduleEventCount(
+                                schedule.events.length,
+                              ),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                if (selected) {
+                                  draft.remove(schedule.id);
+                                } else {
+                                  draft.add(schedule.id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => popWith(null),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: draft.isEmpty
+                      ? null
+                      : () => popWith(
+                          schedules
+                              .where((s) => draft.contains(s.id))
+                              .map((s) => s.id)
+                              .toList(),
+                        ),
+                  child: Text(confirmText),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _importGeneralSchedulesJsonFile(
+    TimetableProvider provider,
+  ) async {
+    final source = await _pickTextFile(allowedExtensions: const ['json']);
+    if (source == null || !mounted) return;
+    await _importGeneralSchedulesJsonSource(provider, source, context);
+  }
+
+  Future<void> _importGeneralSchedulesJsonText(
+    TimetableProvider provider,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextImportPage(
+          title: l10n.importGeneralSchedules,
+          onSubmit: (context, content) async {
+            return _importGeneralSchedulesJsonSource(
+              provider,
+              content,
+              context,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _importGeneralSchedulesJsonSource(
+    TimetableProvider provider,
+    String content,
+    BuildContext feedbackContext,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final preview = provider.previewImportGeneralSchedules(content);
+      if (!feedbackContext.mounted) return false;
+      final selectedIds = await _pickGeneralScheduleIds(
+        schedules: preview,
+        title: l10n.selectSchedulesToImport,
+        confirmText: l10n.save,
+      );
+      if (selectedIds == null || selectedIds.isEmpty) return false;
+
+      var mode = GeneralScheduleImportMode.addAsNew;
+      if (selectedIds.length == 1 &&
+          provider.activeGeneralScheduleOrNull != null &&
+          feedbackContext.mounted) {
+        final choice = await showExpressiveDialog<String>(
+          context: feedbackContext,
+          builder: (ctx) {
+            var popped = false;
+            void popWith(String value) {
+              if (popped) return;
+              popped = true;
+              Navigator.of(ctx).pop(value);
+            }
+
+            return AlertDialog(
+              title: Text(l10n.dataImportExport),
+              content: Text(l10n.replaceActiveSchedulePrompt),
+              actions: [
+                TextButton(
+                  onPressed: () => popWith('new'),
+                  child: Text(l10n.addAsNewSchedule),
+                ),
+                FilledButton(
+                  onPressed: () => popWith('replace'),
+                  child: Text(l10n.save),
+                ),
+              ],
+            );
+          },
+        );
+        if (choice == null) {
+          return false;
+        }
+        if (choice == 'replace') {
+          mode = GeneralScheduleImportMode.replaceActive;
+        }
+      }
+
+      final result = await provider.importSelectedGeneralSchedulesJson(
+        content,
+        scheduleIds: selectedIds,
+        mode: mode,
+      );
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(feedbackContext).showSnackBar(
+          SnackBar(content: Text(_formatGeneralImportResult(result, l10n))),
+        );
+      }
+      return true;
+    } on FormatException catch (e) {
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(
+          feedbackContext,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _importGeneralSchedulesIcsFile(
+    TimetableProvider provider,
+  ) async {
+    final source = await _pickTextFile(allowedExtensions: const ['ics']);
+    if (source == null || !mounted) return;
+    await _importGeneralSchedulesIcsSource(provider, source, context);
+  }
+
+  Future<void> _importGeneralSchedulesIcsText(
+    TimetableProvider provider,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TextImportPage(
+          title: l10n.importIcs,
+          labelText: l10n.icsContent,
+          hintText: l10n.pasteIcsContentHint,
+          onSubmit: (context, content) async {
+            return _importGeneralSchedulesIcsSource(provider, content, context);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _importGeneralSchedulesIcsSource(
+    TimetableProvider provider,
+    String content,
+    BuildContext feedbackContext,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final preview = provider.previewImportGeneralSchedulesIcs(content);
+      if (!feedbackContext.mounted) return false;
+      var mode = GeneralScheduleImportMode.addAsNew;
+      if (preview.schedules.length == 1 &&
+          provider.activeGeneralScheduleOrNull != null &&
+          feedbackContext.mounted) {
+        final choice = await showExpressiveDialog<String>(
+          context: feedbackContext,
+          builder: (ctx) {
+            var popped = false;
+            void popWith(String value) {
+              if (popped) return;
+              popped = true;
+              Navigator.of(ctx).pop(value);
+            }
+
+            return AlertDialog(
+              title: Text(l10n.importIcs),
+              content: Text(
+                l10n.importIcsPreviewPrompt(
+                  preview.schedules.first.events.length,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => popWith('new'),
+                  child: Text(l10n.addAsNewSchedule),
+                ),
+                FilledButton(
+                  onPressed: () => popWith('replace'),
+                  child: Text(l10n.save),
+                ),
+              ],
+            );
+          },
+        );
+        if (choice == null) {
+          return false;
+        }
+        if (choice == 'replace') {
+          mode = GeneralScheduleImportMode.replaceActive;
+        }
+      }
+      final result = await provider.importGeneralSchedulesIcs(
+        content,
+        mode: mode,
+      );
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(feedbackContext).showSnackBar(
+          SnackBar(content: Text(_formatGeneralImportResult(result, l10n))),
+        );
+      }
+      return true;
+    } on FormatException catch (e) {
+      if (feedbackContext.mounted) {
+        ScaffoldMessenger.of(
+          feedbackContext,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return false;
+    }
+  }
+
+  Future<String?> _pickTextFile({
+    required List<String> allowedExtensions,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final source = await TextFilePicker.pickText(
+        allowedExtensions: allowedExtensions,
+      );
+      if (!mounted) {
+        return null;
+      }
+      return source;
+    } catch (_) {
+      if (mounted) {
+        _showMessage(l10n.importFailedCheckContent);
+      }
+      return null;
+    }
+  }
+
+  Future<void> _exportGeneralSchedules(
+    TimetableProvider provider, {
+    required bool share,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final activeId = provider.activeGeneralScheduleOrNull?.id;
+    final selectedIds = await _pickGeneralScheduleIds(
+      schedules: provider.generalSchedules,
+      title: l10n.selectSchedulesToExport,
+      confirmText: share ? l10n.share : l10n.save,
+      initialSelectedIds: activeId == null ? const [] : [activeId],
+    );
+    if (selectedIds == null || selectedIds.isEmpty) return;
+    try {
+      final content = provider.exportSelectedGeneralSchedulesJson(selectedIds);
+      const fileName = 'Sked_general_schedules.json';
+      if (share) {
+        await _shareJson(fileName, content);
+      } else {
+        await _saveJsonToFile(fileName, content);
+      }
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.saveFailedRetry);
+    }
+  }
+
+  Future<void> _exportGeneralSchedulesAsText(
+    TimetableProvider provider, {
+    required _ExportFormat format,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final activeId = provider.activeGeneralScheduleOrNull?.id;
+    final selectedIds = await _pickGeneralScheduleIds(
+      schedules: provider.generalSchedules,
+      title: format == _ExportFormat.ics
+          ? l10n.selectCalendarsToCopyIcs
+          : l10n.selectSchedulesToExport,
+      confirmText: l10n.copyText,
+      initialSelectedIds: activeId == null ? const [] : [activeId],
+    );
+    if (selectedIds == null || selectedIds.isEmpty || !mounted) return;
+    try {
+      final content = format == _ExportFormat.ics
+          ? provider.exportSelectedGeneralSchedulesIcs(selectedIds)
+          : provider.exportSelectedGeneralSchedulesJson(selectedIds);
+      await showTextExportDialog(
+        context,
+        title: format == _ExportFormat.ics
+            ? l10n.exportIcsText
+            : l10n.exportJsonText,
+        content: content,
+      );
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.saveFailedRetry);
+    }
+  }
+
+  Future<void> _exportGeneralSchedulesIcs(
+    TimetableProvider provider, {
+    required bool share,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final activeId = provider.activeGeneralScheduleOrNull?.id;
+    final selectedIds = await _pickGeneralScheduleIds(
+      schedules: provider.generalSchedules,
+      title: l10n.selectCalendarsToExportIcs,
+      confirmText: share ? l10n.share : l10n.save,
+      initialSelectedIds: activeId == null ? const [] : [activeId],
+    );
+    if (selectedIds == null || selectedIds.isEmpty) return;
+    try {
+      final content = provider.exportSelectedGeneralSchedulesIcs(selectedIds);
+      const fileName = 'Sked_general_schedules.ics';
+      final payload = ExportPayload(
+        fileName: fileName,
+        content: content,
+        mimeType: 'text/calendar',
+        allowedExtensions: const ['ics'],
+      );
+      if (share) {
+        await _shareFile(payload);
+      } else {
+        await _saveFileToDisk(payload);
+      }
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.saveFailedRetry);
+    }
+  }
+
+  String _formatGeneralImportResult(
+    GeneralScheduleImportResult result,
+    AppLocalizations l10n,
+  ) {
+    if (!result.hasWarnings) {
+      return l10n.importedSchedulesCount(result.importedCount);
+    }
+    final warningText = result.icsWarnings
+        .map((warning) => _formatIcsWarning(warning, l10n))
+        .take(2)
+        .join(' ');
+    return '${l10n.importedSchedulesWithWarnings(result.importedCount, result.icsWarnings.length)} $warningText';
+  }
+
+  String _formatIcsWarning(
+    GeneralCalendarIcsImportWarning warning,
+    AppLocalizations l10n,
+  ) {
+    return switch (warning.code) {
+      GeneralCalendarIcsWarningCode.missingDtStart =>
+        l10n.importWarningSkippedMissingStart,
+      GeneralCalendarIcsWarningCode.unsupportedDtStart =>
+        l10n.importWarningSkippedUnsupportedStart,
+      GeneralCalendarIcsWarningCode.adjustedEnd =>
+        l10n.importWarningAdjustedEnd,
+      GeneralCalendarIcsWarningCode.unsupportedFields =>
+        l10n.importWarningUnsupportedFields(warning.values.join(', ')),
+      GeneralCalendarIcsWarningCode.unsupportedRRuleFrequency =>
+        l10n.importWarningUnsupportedRRuleFrequency(
+          warning.values.isEmpty ? '' : warning.values.first,
+        ),
+    };
+  }
+}
+
+class _RecoveryNoticeTile extends StatelessWidget {
+  const _RecoveryNoticeTile({required this.status});
+
+  final RecoveryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isFailure = status == RecoveryStatus.failedBackupRestore;
+    final tone = isFailure
+        ? theme.colorScheme.errorContainer
+        : theme.colorScheme.primary.withValues(alpha: 0.12);
+    final foreground = isFailure
+        ? theme.colorScheme.onErrorContainer
+        : theme.colorScheme.primary;
+    final message = isFailure
+        ? l10n.dataBackupRestoreFailedNotice
+        : l10n.dataRestoredFromBackupNotice;
+    return Material(
+      color: tone,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isFailure ? Icons.error_outline : Icons.history_toggle_off,
+              color: foreground,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionSheetHeader extends StatelessWidget {
+  const _ActionSheetHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 40,
+          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionSheetGroup extends StatelessWidget {
+  const _ActionSheetGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: 72,
+                color: colorScheme.outlineVariant.withValues(alpha: 0.48),
+              ),
+            children[index],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionSheetTile extends StatelessWidget {
+  const _ActionSheetTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return ExpressiveTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 72),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 10, 10),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: Icon(icon, color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 32,
+                height: 48,
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 28,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionToolbar extends StatelessWidget {
+  const _SelectionToolbar({
+    required this.selectedCount,
+    required this.totalCount,
+    required this.onSelectAll,
+    required this.onClear,
+  });
+
+  final int selectedCount;
+  final int totalCount;
+  final VoidCallback onSelectAll;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '$selectedCount / $totalCount',
+            style: textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: onSelectAll,
+          child: Text(AppLocalizations.of(context).selectAll),
+        ),
+        TextButton(
+          onPressed: onClear,
+          child: Text(AppLocalizations.of(context).clear),
+        ),      ],
+    );
+  }
+}
+
+class _SelectableExportTile extends StatelessWidget {
+  const _SelectableExportTile({
+    required this.selected,
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final Widget leading;
+  final Widget title;
+  final Widget subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ExpressiveTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.primary.withValues(alpha: 0.08)
+              : colors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? colors.primary : colors.outlineVariant,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DefaultTextStyle.merge(
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
+                      ),
+                      child: title,
+                    ),
+                    const SizedBox(height: 2),
+                    DefaultTextStyle.merge(
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      child: subtitle,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                color: selected ? colors.primary : colors.outlineVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

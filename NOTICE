@@ -1,0 +1,85 @@
+LinkStudy third-party notices
+=============================
+
+Copyright (c) TheoHowie (LinkStudy modifications)
+Copyright (c) Mashiro0619 (original Sked project)
+
+LinkStudy is a derivative work of Sked (https://github.com/Mashiro0619/Sked),
+originally developed by Mashiro0619, and modified by TheoHowie (repository:
+https://github.com/theohowie/linkstudy). LinkStudy reuses Sked's UI and parts
+of its functionality, and adds new features on top of it.
+
+Both Sked and LinkStudy are licensed under the GNU Affero General Public
+License v3.0 (AGPL-3.0). This notice file covers bundled third-party materials
+that use different license terms.
+
+App icon and related launcher assets
+------------------------------------
+
+The app icon and related launcher assets distributed with this project are
+derived from Google Material Icons / Material Symbols and were modified for
+this project.
+
+Upstream source:
+- Google Material Icons / Material Symbols
+- Copyright Google LLC
+- Licensed under the Apache License, Version 2.0
+- License text: https://www.apache.org/licenses/LICENSE-2.0
+
+These modified icon assets remain subject to the Apache License, Version 2.0.
+
+Font Awesome icons
+------------------
+
+This app uses icons from Font Awesome Free via the font_awesome_flutter
+package (https://pub.dev/packages/font_awesome_flutter).
+
+Upstream source:
+- Font Awesome Free (https://fontawesome.com)
+- Icons: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+- Fonts: SIL Open Font License 1.1 (https://scripts.sil.org/OFL)
+- License details: https://fontawesome.com/license/free
+
+Attribution: Font Awesome Icons by Fonticons, Inc. (https://fontawesome.com).
+
+Third-party Dart packages
+-------------------------
+
+The app depends on the following notable third-party Dart/Flutter packages,
+each distributed under its own license (full texts are bundled in the
+packages and shown in the in-app open-source licenses page):
+
+- flutter (Flutter SDK) - BSD-3-Clause
+- provider (https://pub.dev/packages/provider) - MIT
+- path / path_provider - BSD-3-Clause
+- shared_preferences - BSD-3-Clause
+- flutter_secure_storage - BSD-3-Clause
+- share_plus - BSD-3-Clause
+- url_launcher - BSD-3-Clause
+- file_selector - BSD-3-Clause
+- package_info_plus - BSD-3-Clause
+- http / crypto - BSD-3-Clause
+- font_awesome_flutter - MIT (icons/fonts: see "Font Awesome icons" above)
+- flutter_colorpicker - MIT
+- lunar (https://pub.dev/packages/lunar) - MIT
+- flutter_inappwebview - Apache-2.0
+- flutter_localizations (Flutter SDK) - BSD-3-Clause
+
+Their complete license texts are available in the app's open-source licenses
+page and in the respective package repositories.
+
+Flutter dependencies and in-app license page
+--------------------------------------------
+
+This app also uses third-party Flutter packages and SDK-provided components
+not listed above. Their license information can be viewed from the app's
+open-source licenses page.
+
+Imported data and school-site configuration
+-------------------------------------------
+
+School-site JSON files, timetable JSON files, period templates, and timetable
+page source submitted for parsing are user-provided data, not bundled
+third-party assets. They are handled according to the app's privacy policy and
+are not covered by this notice file unless the user adds separate third-party
+materials on their own.

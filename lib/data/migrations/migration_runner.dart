@@ -1,0 +1,111 @@
+import 'migration.dart';
+
+/// 顶层 AppData JSON 的版本迁移引擎。
+///
+/// 用法：
+/// ```
+/// final runner = MigrationRunner(
+///   targetVersion: 2,
+///   migrations: const [MigrationV1ToV2()],
+/// );
+/// final upgraded = runner.run(rawJson);
+/// ```
+///
+/// 约束：
+/// - 入参 map 不会被修改。
+/// - 缺失 `schemaVersion` 视为 v1。
+/// - 数据版本高于 target 抛 [MigrationException]，本应用不做降级。
+/// - 中间断链（缺少某一步 migration）抛 [MigrationException]。
+class MigrationRunner {
+  const MigrationRunner({
+    required this.targetVersion,
+    required this.migrations,
+  });
+
+  final int targetVersion;
+  final List<Migration> migrations;
+
+  Map<String, dynamic> run(Map<String, dynamic> input) {
+    final currentVersion = _readVersion(input);
+
+    if (currentVersion > targetVersion) {
+      throw MigrationException(
+        'Data schemaVersion $currentVersion exceeds supported '
+        'targetVersion $targetVersion; downgrade is not supported.',
+      );
+    }
+
+    var working = _deepCopyMap(input);
+    var version = currentVersion;
+
+    while (version < targetVersion) {
+      final next = _findMigrationFrom(version);
+      if (next == null) {
+        throw MigrationException(
+          'No migration registered from schemaVersion $version '
+          'to $targetVersion.',
+        );
+      }
+      if (next.to != version + 1) {
+        throw MigrationException(
+          'Invalid migration registered from schemaVersion $version '
+          'to ${next.to}; migrations must advance exactly one version.',
+        );
+      }
+      working = _deepCopyMap(next.apply(_deepCopyMap(working)));
+      version = next.to;
+    }
+
+    working['schemaVersion'] = version;
+    return working;
+  }
+
+  Migration? _findMigrationFrom(int version) {
+    for (final m in migrations) {
+      if (m.from == version) return m;
+    }
+    return null;
+  }
+
+  static int _readVersion(Map<String, dynamic> json) {
+    if (!json.containsKey('schemaVersion')) {
+      return 1;
+    }
+    final raw = json['schemaVersion'];
+    int? version;
+    if (raw is int) {
+      version = raw;
+    } else if (raw is num && raw.isFinite && raw % 1 == 0) {
+      version = raw.toInt();
+    } else if (raw is String) {
+      final trimmed = raw.trim();
+      if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+        version = int.parse(trimmed);
+      }
+    }
+    if (version != null && version > 0) {
+      return version;
+    }
+    throw const MigrationException('Data schemaVersion is invalid.');
+  }
+
+  static Map<String, dynamic> _deepCopyMap(Map<String, dynamic> source) {
+    return {
+      for (final entry in source.entries)
+        entry.key: _deepCopyValue(entry.value),
+    };
+  }
+
+  static Object? _deepCopyValue(Object? value) {
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          entry.key.toString(): _deepCopyValue(entry.value),
+      };
+    }
+    if (value is List) {
+      return [for (final item in value) _deepCopyValue(item)];
+    }
+    return value;
+  }
+}

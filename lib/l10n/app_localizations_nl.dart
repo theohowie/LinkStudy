@@ -1,0 +1,1811 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Dutch Flemish (`nl`).
+class AppLocalizationsNl extends AppLocalizations {
+  AppLocalizationsNl([String locale = 'nl']) : super(locale);
+
+  @override
+  String get appTitle => 'LinkStudy';
+
+  @override
+  String weekLabel(int week) {
+    return 'Week $week';
+  }
+
+  @override
+  String get addCourse => 'Add course';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get multiTimetableSwitch => 'Switch timetables';
+
+  @override
+  String currentTimetableWeeks(int weeks) {
+    return 'Current timetable · $weeks weeks';
+  }
+
+  @override
+  String tapToSwitchWeeks(int weeks) {
+    return 'Tap to switch · $weeks weeks';
+  }
+
+  @override
+  String get editTimetable => 'Edit timetable';
+
+  @override
+  String get createTimetable => 'New timetable';
+
+  @override
+  String get jumpToWeek => 'Jump to week';
+
+  @override
+  String get timetable => 'Timetable';
+
+  @override
+  String get timetableName => 'Timetable name';
+
+  @override
+  String get totalWeeks => 'Total weeks';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get deleteTimetableTitle => 'Delete timetable';
+
+  @override
+  String deleteTimetableMessage(Object name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get noTimetableTitle => 'No timetable yet';
+
+  @override
+  String get noTimetableMessage =>
+      'Create a timetable or import one from a JSON file.';
+
+  @override
+  String get importTimetable => 'Import timetable';
+
+  @override
+  String get courseName => 'Course name';
+
+  @override
+  String get location => 'Location';
+
+  @override
+  String get dayOfWeek => 'Day';
+
+  @override
+  String get semesterWeeks => 'Weeks';
+
+  @override
+  String get startTime => 'Start time';
+
+  @override
+  String get endTime => 'End time';
+
+  @override
+  String get linkedPeriods => 'Linked periods';
+
+  @override
+  String get linkedPeriodsUnmatched =>
+      'No periods matched for the current time. Tap to choose manually.';
+
+  @override
+  String periodRangeLabel(int start, int end) {
+    return 'Period $start-$end';
+  }
+
+  @override
+  String get teacherName => 'Teacher';
+
+  @override
+  String get credits => 'Credits';
+
+  @override
+  String get remarks => 'Remarks';
+
+  @override
+  String get customFields => 'Custom fields';
+
+  @override
+  String get customFieldsHint => 'One per line, format: key:value';
+
+  @override
+  String get selectDayOfWeek => 'Choose day';
+
+  @override
+  String get selectSemesterWeeks => 'Choose weeks';
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get selectLinkedPeriods => 'Choose linked periods';
+
+  @override
+  String get addCourseTitle => 'Add course';
+
+  @override
+  String get editCourseTitle => 'Edit course';
+
+  @override
+  String get editCourseTooltip => 'Edit course';
+
+  @override
+  String get place => 'Location';
+
+  @override
+  String get time => 'Time';
+
+  @override
+  String get notFilled => 'Not filled';
+
+  @override
+  String get none => 'None';
+
+  @override
+  String get conflictCourses => 'Conflicting courses';
+
+  @override
+  String get locationNotFilled => 'Location not filled';
+
+  @override
+  String get setAsDisplayed => 'Set as displayed';
+
+  @override
+  String get editThisCourse => 'Edit this course';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsSectionTimetable => 'Timetable';
+
+  @override
+  String get settingsSectionGeneralSchedule => 'General schedule';
+
+  @override
+  String get settingsSectionAppearance => 'Appearance';
+
+  @override
+  String get settingsSectionApp => 'App';
+
+  @override
+  String get noTimetableSettings =>
+      'No timetable is currently available for settings.';
+
+  @override
+  String get semesterStartDate => 'Semester start date';
+
+  @override
+  String get periodTimeSets => 'Period time set';
+
+  @override
+  String get noPeriodTimeAvailable => 'No available period time set';
+
+  @override
+  String periodTimeSetSummary(Object name, int count) {
+    return '$name · $count periods';
+  }
+
+  @override
+  String get coursePopupDismissSetting =>
+      'Allow outside tap to close course popup';
+
+  @override
+  String get coursePopupDismissSettingHint =>
+      'Turning this off also disables swipe-down dismissal.';
+
+  @override
+  String get preserveTimetableGaps => 'Preserve timetable gaps';
+
+  @override
+  String get preserveTimetableGapsHint =>
+      'When off, lunch and break gaps are collapsed so later classes move upward.';
+
+  @override
+  String get showPastEndedCourses => 'Show past-ended courses';
+
+  @override
+  String get showPastEndedCoursesHint =>
+      'Show courses that have already finished by the real current week with a lighter gray style.';
+
+  @override
+  String get showFutureCourses => 'Show future courses';
+
+  @override
+  String get showFutureCoursesHint =>
+      'Show courses that are not active this week but will appear in later weeks with a gray style.';
+
+  @override
+  String get timetableDisplaySettings => 'Timetable display and interaction';
+
+  @override
+  String get timetableDisplaySettingsDesc =>
+      'Popup dismissal, gaps, gray courses, and grid lines';
+
+  @override
+  String get showTimetableGridLines => 'Show timetable grid lines';
+
+  @override
+  String get showTimetableGridLinesHint =>
+      'Control whether horizontal and vertical grid lines are visible in the timetable.';
+
+  @override
+  String get liveCourseOutlineColor => 'Course outline color';
+
+  @override
+  String get liveCourseOutlineColorHint =>
+      'Choose whether outlines target the current/next course or all displayed courses on the current page.';
+
+  @override
+  String get liveCourseOutlineSettings => 'Course outline';
+
+  @override
+  String get liveCourseOutlineSettingsHint =>
+      'Configure whether the outline is enabled, what it targets, whether it follows the theme color, and the effective outline color.';
+
+  @override
+  String get liveCourseOutlineEnabled => 'Enable outline';
+
+  @override
+  String get liveCourseOutlineFollowTheme => 'Follow theme color';
+
+  @override
+  String get liveCourseOutlineTarget => 'Outline target';
+
+  @override
+  String get liveCourseOutlineTargetCurrentOrNext => 'Current/next course';
+
+  @override
+  String get liveCourseOutlineTargetAllDisplayed => 'All displayed courses';
+
+  @override
+  String get liveCourseOutlineEffectiveColor => 'Effective color';
+
+  @override
+  String get liveCourseOutlineCustomColor => 'Custom outline color';
+
+  @override
+  String get liveCourseOutlineWidth => 'Outline width';
+
+  @override
+  String get outlineWidthUnit => 'px';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get languagePageDescription =>
+      'Choose one of the languages that is truly available in the app.';
+
+  @override
+  String get languageChinese => '中文';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get githubRepositoryUrl => 'github.com/theohowie/linkstudy';
+
+  @override
+  String get apiResponseTitle => 'API response';
+
+  @override
+  String get theme => 'Theme';
+
+  @override
+  String get themeFollowSystem => 'Follow system';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get themeColor => 'Theme color';
+
+  @override
+  String get themeColorModeSingle => 'Single theme color';
+
+  @override
+  String get themeColorModeColorful => 'Colorful';
+
+  @override
+  String get themeColorUiColors => 'UI colors';
+
+  @override
+  String get themeColorCourseColors => 'Course colors';
+
+  @override
+  String get themeColorPrimary => 'Primary';
+
+  @override
+  String get themeColorSecondary => 'Secondary';
+
+  @override
+  String get themeColorTertiary => 'Tertiary';
+
+  @override
+  String get themeColorCourseText => 'Course text';
+
+  @override
+  String get themeColorCourseTextAuto => 'Auto';
+
+  @override
+  String get themeColorCourseTextCustom => 'Custom color';
+
+  @override
+  String get themeColorCourseColorsEmpty =>
+      'Course colors will be generated after importing a timetable.';
+
+  @override
+  String get themeCustomColor => 'Custom color';
+
+  @override
+  String get themeApplyCustomColor => 'Apply color';
+
+  @override
+  String get themeApplySettings => 'Apply settings';
+
+  @override
+  String get dataImportExport => 'Import and export data';
+
+  @override
+  String get dataImportExportDesc =>
+      'Import full data or single timetables, or export current/all timetables.';
+
+  @override
+  String get appBackupTitle => 'App-back-up en herstel';
+
+  @override
+  String get appBackupSubtitle =>
+      'Maak een back-up van roosters, agenda\'s, instellingen en schoolsites of herstel ze. API-sleutels worden niet meegenomen.';
+
+  @override
+  String get appBackupSheetSubtitle =>
+      'Een volledig herstel vervangt de huidige appgegevens. API-sleutels voor de aangepaste parser staan in beveiligde opslag en worden niet naar back-upbestanden geschreven.';
+
+  @override
+  String get restoreBackupFileTitle => 'Herstellen vanuit JSON-bestand';
+
+  @override
+  String get restoreBackupFileSubtitle =>
+      'Kies een volledig LinkStudy-back-upbestand. Je bevestigt voordat er wordt hersteld.';
+
+  @override
+  String get restoreBackupTextTitle => 'Back-up-JSON plakken';
+
+  @override
+  String get restoreBackupTextSubtitle =>
+      'Plak een volledige back-up en herstel de huidige appgegevens.';
+
+  @override
+  String get shareBackupTitle => 'Back-upbestand delen';
+
+  @override
+  String get shareBackupSubtitle =>
+      'Exporteer alle appgegevens als JSON. API-sleutels worden uitgesloten.';
+
+  @override
+  String get saveBackupTitle => 'Back-upbestand opslaan';
+
+  @override
+  String get saveBackupSubtitle =>
+      'Sla een volledige app-back-up op in een lokaal bestand.';
+
+  @override
+  String get copyBackupTitle => 'Back-uptekst kopiëren';
+
+  @override
+  String get copyBackupSubtitle =>
+      'Toon de volledige back-up-JSON zodat je deze kunt kopiëren of tijdelijk bewaren.';
+
+  @override
+  String get restoreBackupConfirmTitle => 'Volledige back-up herstellen?';
+
+  @override
+  String get restoreBackupConfirmMessage =>
+      'Dit vervangt alle huidige roosters, algemene agenda\'s, instellingen en schoolsites. API-sleutels worden niet uit back-ups geïmporteerd; voer de sleutel opnieuw in voordat je opnieuw roosters parseert.';
+
+  @override
+  String get restoreBackupConfirmAction => 'Back-up herstellen';
+
+  @override
+  String get restoreBackupSuccessMessage =>
+      'Volledige app-back-up hersteld. Parser-API-sleutels moeten opnieuw worden ingevoerd.';
+
+  @override
+  String get restoreBackupFailureMessage =>
+      'Herstellen mislukt. Controleer de inhoud van de back-up en probeer het opnieuw.';
+
+  @override
+  String get openSourceLicenses => 'Open-source licenses';
+
+  @override
+  String get openSourceLicensesDesc =>
+      'View licenses for Flutter dependencies and bundled app icon assets.';
+
+  @override
+  String get checkForUpdates => 'Check for updates';
+
+  @override
+  String get checkForUpdatesDesc => 'GitHub';
+
+  @override
+  String alreadyLatestVersion(Object version) {
+    return 'Already on the latest version ($version)';
+  }
+
+  @override
+  String get currentVersionLabel => 'Current version';
+
+  @override
+  String get newVersionAvailable => 'Update available';
+
+  @override
+  String get latestVersionLabel => 'Latest version';
+
+  @override
+  String get updateContentLabel => 'Update details';
+
+  @override
+  String get officialWebsite => 'Official website';
+
+  @override
+  String get googlePlay => 'Google Play';
+
+  @override
+  String get cloudDrive => 'Cloud drive';
+
+  @override
+  String get ignoreThisVersion => 'Ignore this version';
+
+  @override
+  String get openUpdatesFailed => 'Unable to open the update link';
+
+  @override
+  String get updateCheckFailedTitle => 'Update check failed';
+
+  @override
+  String get updateCheckFailedMessage =>
+      'Unable to fetch the latest version from GitHub. You can still open GitHub Releases below.';
+
+  @override
+  String get githubRepository => 'GitHub repository';
+
+  @override
+  String get openGithubFailed => 'Unable to open the GitHub repository link';
+
+  @override
+  String get selectPeriodTimeSet => 'Choose period time set';
+
+  @override
+  String get newItem => 'New';
+
+  @override
+  String get editPeriodTimeSet => 'Edit period time set';
+
+  @override
+  String get importTimetableFiles => 'Import timetable';
+
+  @override
+  String get importTimetableFilesDesc =>
+      'Supports one or multiple timetable files.';
+
+  @override
+  String get importTimetableText => 'Import timetable from text';
+
+  @override
+  String get importTimetableTextDesc =>
+      'Paste timetable JSON content and import it.';
+
+  @override
+  String get shareTimetableFiles => 'Share timetable files';
+
+  @override
+  String get shareTimetableFilesDesc => 'Choose one or more timetables first.';
+
+  @override
+  String get saveTimetableFiles => 'Save timetable files';
+
+  @override
+  String get saveTimetableFilesDesc => 'Choose one or more timetables first.';
+
+  @override
+  String get exportTimetableText => 'Export timetable as text';
+
+  @override
+  String get exportTimetableTextDesc =>
+      'Choose one or more timetables, then copy the JSON content.';
+
+  @override
+  String get jsonContent => 'JSON content';
+
+  @override
+  String get pasteJsonContentHint => 'Paste the JSON content to import.';
+
+  @override
+  String get jsonContentEmpty => 'Paste JSON content first.';
+
+  @override
+  String get copyText => 'Copy';
+
+  @override
+  String get copiedToClipboard => 'Copied to clipboard';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get selectTimetablesToExport => 'Choose timetables to export';
+
+  @override
+  String get selectTimetablesToImport => 'Choose timetables to import';
+
+  @override
+  String timetableCourseCount(int count) {
+    return '$count courses';
+  }
+
+  @override
+  String get importAction => 'Import';
+
+  @override
+  String get importTimetableDialogTitle => 'Import timetable';
+
+  @override
+  String get chooseImportMethod => 'Choose how to import.';
+
+  @override
+  String get importAsNewTimetable => 'Import as new timetable';
+
+  @override
+  String get replaceCurrentTimetable => 'Replace current timetable';
+
+  @override
+  String get importPeriodTimeSetDialogTitle => 'Import period time sets';
+
+  @override
+  String get importPeriodTimeSetDialogBody =>
+      'This file contains bundled period time sets. Do you want to import and associate them?';
+
+  @override
+  String get importBundledPeriodTimeSets => 'Import and associate';
+
+  @override
+  String get discardBundledPeriodTimeSets => 'Discard bundled sets';
+
+  @override
+  String get importDiscardPeriodTimeSetUnavailable =>
+      'No existing period time set is available, so bundled period time sets cannot be discarded.';
+
+  @override
+  String savedToPath(Object path) {
+    return 'Saved to $path';
+  }
+
+  @override
+  String get saveCancelled => 'Save cancelled';
+
+  @override
+  String get fileSaveRestrictedTitle => 'File saving restricted';
+
+  @override
+  String get fileSaveRestrictedRetryMessage =>
+      'The system could not save the file. You can retry or use sharing instead.';
+
+  @override
+  String get retrySave => 'Retry save';
+
+  @override
+  String get fileSaveRestrictedSettingsMessage =>
+      'Enable file access in system settings, then return and try exporting again.';
+
+  @override
+  String get openSettings => 'Open settings';
+
+  @override
+  String get browserDownloadRestrictedTitle => 'Browser download restricted';
+
+  @override
+  String get browserDownloadRestrictedMessage =>
+      'This browser does not support directly saving to a local file. Check browser download permissions or use file sharing instead.';
+
+  @override
+  String get switchToShare => 'Use sharing instead';
+
+  @override
+  String get fileSaveFailedTitle => 'File save failed';
+
+  @override
+  String get fileSaveFailedWindowsMessage =>
+      'Unable to write to the current path. The target folder may be protected, the file may be in use, or the path may be unwritable.';
+
+  @override
+  String get fileSaveFailedGenericMessage =>
+      'The system could not save the file. You can retry, check system settings, or use file sharing instead.';
+
+  @override
+  String get retryLater => 'Try again later';
+
+  @override
+  String get exportSwitchedToShare => 'Switched to file sharing for export';
+
+  @override
+  String get saveFailedRetry => 'Save failed. Please try again later.';
+
+  @override
+  String get importFailedCheckContent =>
+      'Import failed. Please check the file content.';
+
+  @override
+  String get noImportableTimetables =>
+      'No usable timetables were found in the imported file.';
+
+  @override
+  String importedTimetablesCount(int count) {
+    return 'Imported $count timetables';
+  }
+
+  @override
+  String get periodTimesTitle => 'Period times';
+
+  @override
+  String get importExport => 'Import and export';
+
+  @override
+  String get importPeriodTemplate => 'Import period template';
+
+  @override
+  String get importPeriodTemplateText => 'Import period template from text';
+
+  @override
+  String get sharePeriodTemplate => 'Share period template';
+
+  @override
+  String get saveTemplateToFile => 'Save template to file';
+
+  @override
+  String get exportPeriodTemplateText => 'Export period template as text';
+
+  @override
+  String get deletePeriodTimeSet => 'Delete period time set';
+
+  @override
+  String get periodTimeSetName => 'Period time set name';
+
+  @override
+  String get addOnePeriod => 'Add period';
+
+  @override
+  String periodNumberLabel(int index) {
+    return 'Period $index';
+  }
+
+  @override
+  String get deleteThisPeriod => 'Delete this period';
+
+  @override
+  String durationMinutes(int minutes) {
+    return 'Duration $minutes min';
+  }
+
+  @override
+  String gapFromPrevious(int minutes) {
+    return 'Gap from previous $minutes min';
+  }
+
+  @override
+  String get endTimeMustBeLater => 'End time must be later than start time';
+
+  @override
+  String get periodOverlapPrevious => 'This period overlaps the previous one';
+
+  @override
+  String get periodTimesSaved => 'Period times saved';
+
+  @override
+  String get deletePeriodTimeSetTitle => 'Delete period time set';
+
+  @override
+  String deletePeriodTimeSetMessage(Object name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get currentPeriodTimeSet => 'current period time set';
+
+  @override
+  String importedPeriodTimesCount(int count) {
+    return 'Imported $count period times';
+  }
+
+  @override
+  String get periodFilePermissionTitle => 'File permission needed';
+
+  @override
+  String get androidFilePermissionMessage =>
+      'Android export requires file access permission. Grant permission to continue saving.';
+
+  @override
+  String get reauthorize => 'Authorize again';
+
+  @override
+  String get permissionPermanentlyDeniedTitle =>
+      'Permission permanently denied';
+
+  @override
+  String get permissionSettingsExportMessage =>
+      'Enable file access in system settings, then return and try exporting again.';
+
+  @override
+  String get privacyPolicyTitle => 'Privacy Policy';
+
+  @override
+  String get privacyPolicyEntryDesc =>
+      'Learn how the app handles local storage, school-site configuration, file import/export, webpage parsing, and external links.';
+
+  @override
+  String privacyPolicyAcceptedVersionLabel(Object version) {
+    return 'Accepted version: $version';
+  }
+
+  @override
+  String get privacyPolicyIntro =>
+      'LinkStudy is een lokaal-eerst roosterhulpmiddel. Roosters, periodetijdsets en schoolwebsiteconfiguratie worden alleen op je apparaat of in je browser opgeslagen en worden nooit automatisch geüpload. De app verwerkt alleen gegevens wanneer je expliciet acties start zoals importeren, webpagina-analyse, delen of het openen van externe links. Het volledige privacybeleid is online beschikbaar.';
+
+  @override
+  String get privacyPolicyLocalStorageTitle => 'Local storage';
+
+  @override
+  String get privacyPolicyLocalStorageBody =>
+      'Timetable data and related settings are stored in a local file named Sked_data.json inside the app documents directory. Editable school-site configuration is stored separately in Sked_school_sites.json. Custom timetable parser settings are stored locally; the custom API key is stored through the platform secure-storage layer when available. When used in a browser, the same kinds of data are stored in browser storage. The app does not automatically upload this local data to a developer-controlled server.';
+
+  @override
+  String get privacyPolicyImportExportTitle => 'Import and export';
+
+  @override
+  String get privacyPolicyImportExportBody =>
+      'The app reads or writes timetable JSON files, school-site JSON files, and period-template files only when you explicitly choose a file or start an export action. Importing these files is a local operation unless you also choose webpage parsing. Fetching a custom model list is also an explicit network action and only contacts the custom endpoint you configured.';
+
+  @override
+  String get privacyPolicySharingTitle => 'Sharing';
+
+  @override
+  String get privacyPolicySharingBody =>
+      'When you explicitly use sharing, the app passes the exported file to the system share sheet or to the target app you choose. How that file is handled afterward depends on the target app or service you selected.';
+
+  @override
+  String get privacyPolicyExternalLinksTitle => 'External links';
+
+  @override
+  String get privacyPolicyExternalLinksBody =>
+      'When you open external links such as the GitHub repository, the app hands the action off to your browser or another external application. Data handling after that point is governed by the third party you open.';
+
+  @override
+  String get privacyPolicyNoCollectionTitle => 'What the app does not collect';
+
+  @override
+  String get privacyPolicyNoCollectionBody =>
+      'The app does not require a LinkStudy account and does not enable analytics, advertising identifiers, or cloud backup. It also does not provide a dedicated field for collecting school account passwords. If you sign in to a school website inside the app, that interaction happens on the school page you opened.';
+
+  @override
+  String get privacyPolicyFutureFeatureTitle => 'Webpage parsing';
+
+  @override
+  String get privacyPolicyFutureFeatureBody =>
+      'Wanneer je schoolwebpagina-import gebruikt of geplakte roostertekst / HTML analyseert, bereidt en schoont de app de inhoud eerst lokaal op en verzendt daarna de ingediende roostertekst, paginatekst of HTML-inhoud, de optionele paginatitel en URL, de huidige app-taal en de parserprompt naar het OpenAI-compatibele endpoint dat je hebt geconfigureerd. Het ophalen van de modellenlijst vraagt ook datzelfde endpoint aan. LinkStudy biedt geen ingebouwd parser-endpoint en verzendt geen parseraanvragen naar een door de ontwikkelaar beheerde roosterparser-backend. Het aangepaste endpoint en eventuele upstreamdiensten kunnen gegevens opslaan, doorsturen, beperken, verwijderen of anderszins verwerken volgens de regels van de door jou gekozen serviceprovider. Als je een http:// Base URL gebruikt, gebruik die dan alleen op vertrouwde apparaten, vertrouwde netwerken en vertrouwde endpointdiensten, omdat inhoud en API-sleutels mogelijk niet door transportversleuteling worden beschermd.';
+
+  @override
+  String get privacyPolicyUpdatesTitle => 'Policy updates';
+
+  @override
+  String privacyPolicyUpdatesBody(Object version) {
+    return 'The current privacy policy version is $version. If a later version changes how data is handled, the app may ask you to read and agree to the updated policy again.';
+  }
+
+  @override
+  String get privacyGateTitle =>
+      'Please agree to the privacy policy before using the app';
+
+  @override
+  String get privacyGateSummaryStorage =>
+      'Timetables, period-time sets, and school-site configuration are only stored locally and are not automatically uploaded to a developer server.';
+
+  @override
+  String get privacyGateSummaryImportExport =>
+      'Import, export, and sharing only happen when you explicitly start them; webpage parsing sends only the submitted content to your configured parsing endpoint, and you can review the parsed timetable before saving.';
+
+  @override
+  String get privacyGateSummaryUpdates =>
+      'If a later version changes how data is handled, the app may ask you to review the updated privacy policy again.';
+
+  @override
+  String get schoolWebImportEntry => 'Import from school webpage';
+
+  @override
+  String get schoolWebImportEntryDesc =>
+      'Import the current timetable page from the school site.';
+
+  @override
+  String get schoolSitesManageEntry => 'Manage school sites';
+
+  @override
+  String get schoolSitesManageEntryDesc =>
+      'Add, edit, and delete school login URLs, with JSON import and export.';
+
+  @override
+  String get schoolSitesPageTitle => 'School site management';
+
+  @override
+  String get schoolSitesImportJson => 'Import school JSON';
+
+  @override
+  String get schoolSitesShareJson => 'Share school JSON';
+
+  @override
+  String get schoolSitesSaveJson => 'Save school JSON';
+
+  @override
+  String get schoolSitesSaved => 'School sites saved';
+
+  @override
+  String get schoolSitesImported => 'School sites imported';
+
+  @override
+  String get schoolSitesEmpty => 'No school site configuration yet.';
+
+  @override
+  String get schoolSitesNameLabel => 'School name';
+
+  @override
+  String get schoolSitesLoginUrlLabel => 'Login URL';
+
+  @override
+  String get schoolSitesAdd => 'Add school';
+
+  @override
+  String get schoolSitesEdit => 'Edit school';
+
+  @override
+  String get schoolSitesDeleteTitle => 'Delete school';
+
+  @override
+  String schoolSitesDeleteMessage(Object name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get schoolSitesFormInvalid =>
+      'Fill in the school name and login URL first.';
+
+  @override
+  String get schoolSitesJsonFileName => 'Sked_school_sites.json';
+
+  @override
+  String get schoolHtmlImportEntry =>
+      'Import by pasting timetable page content';
+
+  @override
+  String get schoolHtmlImportEntryDesc =>
+      'Paste source code or raw page content containing timetable information manually.';
+
+  @override
+  String get schoolHtmlImportPageTitle => 'Parse timetable from page content';
+
+  @override
+  String get schoolHtmlImportUrlLabel => 'Source URL (optional)';
+
+  @override
+  String get schoolHtmlImportTitleLabel => 'Page title (optional)';
+
+  @override
+  String get schoolHtmlImportHtmlLabel => 'Page content';
+
+  @override
+  String get schoolHtmlImportHtmlHint =>
+      'Paste source code or raw page content containing timetable information here.';
+
+  @override
+  String get schoolHtmlImportNonHtmlHint =>
+      'Any content containing timetable information can be parsed and imported, not just HTML.';
+
+  @override
+  String get schoolHtmlImportCompress => 'Inhoud voorbereiden';
+
+  @override
+  String get schoolHtmlImportCompressed => 'Inhoud voorbereid';
+
+  @override
+  String get schoolHtmlImportCompressFirst => 'Bereid eerst de inhoud voor.';
+
+  @override
+  String get schoolHtmlImportSubmit => 'Parse and import';
+
+  @override
+  String get schoolHtmlImportParsingMayTakeLong =>
+      'Parsing may take a while. Please wait.';
+
+  @override
+  String get schoolHtmlImportEmpty => 'Paste the page HTML first.';
+
+  @override
+  String get schoolHtmlImportReturnToWebPage => 'Back to webpage';
+
+  @override
+  String get schoolWebImportPageTitle => 'School webpage import';
+
+  @override
+  String get schoolWebImportPreview => 'Import preview';
+
+  @override
+  String schoolWebImportCourseCount(int count) {
+    return '$count courses';
+  }
+
+  @override
+  String schoolWebImportPeriodCount(int count) {
+    return '$count periods';
+  }
+
+  @override
+  String get schoolWebImportPageTitleLabel => 'Page title';
+
+  @override
+  String get schoolWebImportParserUsed => 'Parser';
+
+  @override
+  String get schoolWebImportWarnings => 'Import notes';
+
+  @override
+  String get schoolWebImportOpenPageHint =>
+      'Sign in to the school site in-app, then navigate to the timetable page manually.';
+
+  @override
+  String get schoolWebImportConfigMissing =>
+      'Custom parser configuration is incomplete. Fill in the base URL, API key, and model first.';
+
+  @override
+  String get schoolWebImportUnsupportedPlatform =>
+      'This platform does not support embedded web login yet. Please use a platform with WebView support.';
+
+  @override
+  String get schoolWebImportSelectSchool => 'Choose school';
+
+  @override
+  String get schoolWebImportNoSchools =>
+      'No school configuration is available. Check school_sites.json first.';
+
+  @override
+  String get schoolWebImportSchoolLoadFailed =>
+      'Failed to load school configuration. Check the JSON file format.';
+
+  @override
+  String get schoolWebImportImportCurrentPage => 'Import current page';
+
+  @override
+  String get schoolWebImportGoBack => 'Previous page';
+
+  @override
+  String get schoolWebImportLoadingPage => 'Loading page…';
+
+  @override
+  String get schoolWebImportParsing => 'Parsing current page…';
+
+  @override
+  String get schoolWebImportLoadFailed =>
+      'Page load failed. Please refresh or try again later.';
+
+  @override
+  String get schoolWebImportLoadTimedOut =>
+      'Page loading timed out. Please refresh and try again.';
+
+  @override
+  String get schoolWebImportEmptyPage =>
+      'The current page content is empty and cannot be imported yet.';
+
+  @override
+  String get schoolWebImportSuccess => 'Web timetable imported';
+
+  @override
+  String get schoolImportParserSettingsTitle => 'Timetable parser settings';
+
+  @override
+  String get schoolImportParserSettingsDesc =>
+      'Configure your own OpenAI-compatible endpoint. HTTP and HTTPS base URLs are supported.';
+
+  @override
+  String get schoolImportParserSourceTitle => 'Parser source';
+
+  @override
+  String get schoolImportParserSourceCustomOpenAi => 'Custom OpenAI-compatible';
+
+  @override
+  String get schoolImportParserSourceCustomOpenAiDesc =>
+      'Send page content directly to your own OpenAI-compatible endpoint. HTTP endpoints are allowed only for trusted networks.';
+
+  @override
+  String get schoolImportParserCustomOpenAi =>
+      'Custom OpenAI-compatible parser';
+
+  @override
+  String get schoolImportParserCustomPromptTitle => 'Custom prompt';
+
+  @override
+  String get schoolImportParserCustomPromptDescription =>
+      'Edit the built-in parser prompt here. Changes only affect the custom OpenAI-compatible parser.';
+
+  @override
+  String get schoolImportParserCustomPromptHint =>
+      'The built-in prompt is loaded here by default. Clear it to fall back to the built-in version.';
+
+  @override
+  String get schoolImportParserResetDefaultPrompt => 'Reset default prompt';
+
+  @override
+  String get schoolImportParserBaseUrl => 'Base URL';
+
+  @override
+  String get schoolImportParserBaseUrlInvalid =>
+      'De Base URL moet een HTTP- of HTTPS-URL met host zijn.';
+
+  @override
+  String get schoolImportParserApiKey => 'API key';
+
+  @override
+  String get schoolImportParserModel => 'Model';
+
+  @override
+  String get schoolImportParserFetchModels => 'Fetch model list';
+
+  @override
+  String get schoolImportParserFetchingModels => 'Fetching models...';
+
+  @override
+  String get schoolImportParserNoModelsFound =>
+      'No models were returned by the endpoint.';
+
+  @override
+  String schoolImportParserModelsFetched(int count) {
+    return 'Fetched $count models';
+  }
+
+  @override
+  String get schoolImportParserPlaintextWarning =>
+      'The custom API key is stored through the platform secure-storage layer when available. Only use custom parser credentials and HTTP endpoints on devices, browsers, and networks you trust.';
+
+  @override
+  String get schoolImportParserCustomConfigIncomplete =>
+      'Custom parser configuration is incomplete. Fill in the base URL, API key, and model first.';
+
+  @override
+  String schoolImportParserCurrentSourceCustom(Object model) {
+    return 'Parser: Custom ($model)';
+  }
+
+  @override
+  String get privacyViewFullPolicy => 'View full privacy policy';
+
+  @override
+  String get privacyAgreeAndContinue => 'Agree and continue';
+
+  @override
+  String get privacyDecline => 'Decline';
+
+  @override
+  String get privacyDeclineWebHint =>
+      'This browser environment does not allow the app to close the page for you. If you do not agree, please close this tab or window yourself.';
+
+  @override
+  String get defaultPeriodTimeSetName => 'Default periods';
+
+  @override
+  String get periodTimeSetFallbackName => 'Period times';
+
+  @override
+  String get untitledTimetableName => 'Untitled timetable';
+
+  @override
+  String get newTimetableName => 'New timetable';
+
+  @override
+  String get newPeriodTimeSetName => 'New period time set';
+
+  @override
+  String get emptyTimetableName => 'Empty timetable';
+
+  @override
+  String importedPeriodTimeSetName(Object name) {
+    return '$name periods';
+  }
+
+  @override
+  String get importFileTypeMismatchMessage =>
+      'Import file type does not match.';
+
+  @override
+  String get importFileVersionUnsupportedMessage =>
+      'This import file version is not supported yet.';
+
+  @override
+  String get noPeriodTimesInImportMessage =>
+      'No period times found in the import file.';
+
+  @override
+  String get selectAtLeastOneTimetableMessage =>
+      'Please select at least one timetable.';
+
+  @override
+  String get noExportableTimetableMessage =>
+      'There is no timetable available to export.';
+
+  @override
+  String get replaceActiveRequiresSingleTimetableMessage =>
+      'Replacing the current timetable only supports selecting one timetable.';
+
+  @override
+  String get noActiveTimetableToReplaceMessage =>
+      'There is no current timetable to replace.';
+
+  @override
+  String periodTimeSetInUseMessage(int count) {
+    return 'This period time set is still used by $count timetable(s). Reassign them before deleting.';
+  }
+
+  @override
+  String get weekdayMonday => 'Monday';
+
+  @override
+  String get weekdayTuesday => 'Tuesday';
+
+  @override
+  String get weekdayWednesday => 'Wednesday';
+
+  @override
+  String get weekdayThursday => 'Thursday';
+
+  @override
+  String get weekdayFriday => 'Friday';
+
+  @override
+  String get weekdaySaturday => 'Saturday';
+
+  @override
+  String get weekdaySunday => 'Sunday';
+
+  @override
+  String get weekdayShortMonday => 'Mon';
+
+  @override
+  String get weekdayShortTuesday => 'Tue';
+
+  @override
+  String get weekdayShortWednesday => 'Wed';
+
+  @override
+  String get weekdayShortThursday => 'Thu';
+
+  @override
+  String get weekdayShortFriday => 'Fri';
+
+  @override
+  String get weekdayShortSaturday => 'Sat';
+
+  @override
+  String get weekdayShortSunday => 'Sun';
+
+  @override
+  String get monthJanuary => 'Jan';
+
+  @override
+  String get monthFebruary => 'Feb';
+
+  @override
+  String get monthMarch => 'Mar';
+
+  @override
+  String get monthApril => 'Apr';
+
+  @override
+  String get monthMay => 'May';
+
+  @override
+  String get monthJune => 'Jun';
+
+  @override
+  String get monthJuly => 'Jul';
+
+  @override
+  String get monthAugust => 'Aug';
+
+  @override
+  String get monthSeptember => 'Sep';
+
+  @override
+  String get monthOctober => 'Oct';
+
+  @override
+  String get monthNovember => 'Nov';
+
+  @override
+  String get monthDecember => 'Dec';
+
+  @override
+  String get semesterWeeksWholeTerm => 'All semester';
+
+  @override
+  String semesterWeeksRange(Object start, Object end) {
+    return 'Weeks $start-$end';
+  }
+
+  @override
+  String semesterWeeksList(Object value) {
+    return 'Weeks $value';
+  }
+
+  @override
+  String get generalSchedule => 'General schedule';
+
+  @override
+  String get studentTimetable => 'Student timetable';
+
+  @override
+  String get firstLaunchTitle => 'Kies je startmodus';
+
+  @override
+  String get firstLaunchSubtitle =>
+      'Kies de werkruimte die je het meest gebruikt. Je kunt later van modus wisselen.';
+
+  @override
+  String get firstLaunchStudentDesc =>
+      'Beheer roosters, vakken, weken, lestijden en import.';
+
+  @override
+  String get firstLaunchGeneralDesc =>
+      'Beheer agenda\'s, evenementen, herinneringen en JSON / ICS-gegevens.';
+
+  @override
+  String get firstLaunchStartStudent => 'Starten met rooster';
+
+  @override
+  String get firstLaunchStartGeneral => 'Starten met agenda';
+
+  @override
+  String get firstLaunchPrivacyHint =>
+      'Je leest en accepteert het privacybeleid voordat je verdergaat.';
+
+  @override
+  String get firstLaunchPreparingPrivacy => 'Privacycontrole voorbereiden...';
+
+  @override
+  String get switchMode => 'Switch mode';
+
+  @override
+  String get generalScheduleComingSoon => 'General schedule coming soon';
+
+  @override
+  String get switchToStudentTimetable => 'Switch to Student timetable';
+
+  @override
+  String get mySchedule => 'My schedule';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get addEvent => 'Add event';
+
+  @override
+  String get editEvent => 'Edit event';
+
+  @override
+  String get eventTitle => 'Title';
+
+  @override
+  String get eventTitleRequired => 'Title is required';
+
+  @override
+  String get eventStartTime => 'Start time';
+
+  @override
+  String get eventEndTime => 'End time';
+
+  @override
+  String get eventDate => 'Date';
+
+  @override
+  String get eventTime => 'Time';
+
+  @override
+  String get eventNotes => 'Notes';
+
+  @override
+  String get eventColor => 'Color';
+
+  @override
+  String get eventRecurrence => 'Repeat';
+
+  @override
+  String get recurrenceNone => 'Does not repeat';
+
+  @override
+  String get recurrenceWeekly => 'Weekly';
+
+  @override
+  String get recurrenceEndDate => 'End date';
+
+  @override
+  String get recurrenceNoEndDate => 'No end date';
+
+  @override
+  String get recurrenceSetEndDate => 'Set';
+
+  @override
+  String get recurrenceChangeEndDate => 'Change';
+
+  @override
+  String get repeatsWeekly => 'Repeats weekly';
+
+  @override
+  String recurrenceUntil(Object date) {
+    return 'Until $date';
+  }
+
+  @override
+  String get switchToGeneralSchedule => 'Switch to General schedule';
+
+  @override
+  String get generalDisplaySettings => 'General display settings';
+
+  @override
+  String get generalDisplaySettingsDesc =>
+      'Toggles for the general schedule view';
+
+  @override
+  String get closePopupOnOutsideTap => 'Close popup on tap outside';
+
+  @override
+  String get showGridLines => 'Show grid lines';
+
+  @override
+  String get generalScheduleImportExport => 'Schedule import & export';
+
+  @override
+  String get generalScheduleImportExportDesc =>
+      'Import or share general schedules';
+
+  @override
+  String get importGeneralSchedules => 'Import schedules';
+
+  @override
+  String get importGeneralSchedulesDesc => 'Read schedules from a JSON file';
+
+  @override
+  String get shareGeneralSchedules => 'Share schedules';
+
+  @override
+  String get shareGeneralSchedulesDesc => 'Share schedules as a JSON file';
+
+  @override
+  String get saveGeneralSchedules => 'Save schedules';
+
+  @override
+  String get saveGeneralSchedulesDesc => 'Save schedules as a JSON file';
+
+  @override
+  String get selectSchedulesToExport => 'Select schedules to export';
+
+  @override
+  String get selectSchedulesToImport => 'Select schedules to import';
+
+  @override
+  String generalScheduleEventCount(int count) {
+    return 'Events: $count';
+  }
+
+  @override
+  String importedSchedulesCount(int count) {
+    return 'Imported $count schedules';
+  }
+
+  @override
+  String get replaceActiveSchedulePrompt =>
+      'Replace current schedule with the imported one?';
+
+  @override
+  String get addAsNewSchedule => 'Add as new';
+
+  @override
+  String get selectAtLeastOneScheduleMessage =>
+      'Please select at least one schedule.';
+
+  @override
+  String get noExportableScheduleMessage => 'No schedule available to export.';
+
+  @override
+  String get noSchedulesInImportMessage => 'Import file contains no schedules.';
+
+  @override
+  String get replaceActiveRequiresSingleScheduleMessage =>
+      'Choose exactly one schedule to replace the current one.';
+
+  @override
+  String get noActiveScheduleToReplaceMessage =>
+      'No current schedule to replace.';
+
+  @override
+  String get calendars => 'Calendars';
+
+  @override
+  String get calendar => 'Calendar';
+
+  @override
+  String get viewWeek => 'Week';
+
+  @override
+  String get viewDay => 'Day';
+
+  @override
+  String get viewList => 'List';
+
+  @override
+  String get viewMonth => 'Month';
+
+  @override
+  String get eventDuplicated => 'Event duplicated';
+
+  @override
+  String get searchEvents => 'Search events';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String get filterByColor => 'Filter by color';
+
+  @override
+  String get allColors => 'All colors';
+
+  @override
+  String upcomingEventsCount(int count) {
+    return 'Upcoming $count';
+  }
+
+  @override
+  String overdueEventsCount(int count) {
+    return 'Overdue $count';
+  }
+
+  @override
+  String get allDay => 'All-day';
+
+  @override
+  String moreEvents(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get noMatchingEvents => 'No matching events';
+
+  @override
+  String get noUpcomingEvents => 'No upcoming events';
+
+  @override
+  String get addCalendar => 'Add calendar';
+
+  @override
+  String get newCalendar => 'New calendar';
+
+  @override
+  String get hideCalendar => 'Hide calendar';
+
+  @override
+  String get showCalendar => 'Show calendar';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get renameCalendar => 'Rename calendar';
+
+  @override
+  String get name => 'Name';
+
+  @override
+  String get deleteCalendar => 'Delete calendar';
+
+  @override
+  String deleteCalendarMessage(Object name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get deleteThisOccurrence => 'Delete this';
+
+  @override
+  String get deleteFutureOccurrences => 'Delete future';
+
+  @override
+  String get deleteAllOccurrences => 'Delete all';
+
+  @override
+  String get duplicateEvent => 'Duplicate';
+
+  @override
+  String get repeatsDaily => 'Repeats daily';
+
+  @override
+  String get repeatsMonthly => 'Repeats monthly';
+
+  @override
+  String repeatsEvery(int interval, Object unit) {
+    return 'Repeats every $interval $unit';
+  }
+
+  @override
+  String recurrenceCountTimes(int count) {
+    return '$count times';
+  }
+
+  @override
+  String get recurrenceDaily => 'Daily';
+
+  @override
+  String get recurrenceMonthly => 'Monthly';
+
+  @override
+  String get recurrenceCustom => 'Custom';
+
+  @override
+  String get recurrenceEvery => 'Every';
+
+  @override
+  String get recurrenceUnit => 'Unit';
+
+  @override
+  String get recurrenceDays => 'Days';
+
+  @override
+  String get recurrenceWeeks => 'Weeks';
+
+  @override
+  String get recurrenceMonths => 'Months';
+
+  @override
+  String get recurrenceRepeatCount => 'Repeat count';
+
+  @override
+  String get recurrenceNoLimit => 'No limit';
+
+  @override
+  String get recurrencePositiveNumber => 'Enter a positive number';
+
+  @override
+  String get clearEndDate => 'Clear end date';
+
+  @override
+  String get pickDate => 'Pick date';
+
+  @override
+  String get pickTime => 'Pick time';
+
+  @override
+  String get reminder => 'In-app reminder';
+
+  @override
+  String get reminderAtStart => 'At start';
+
+  @override
+  String reminderMinutesBefore(int minutes) {
+    return '$minutes min before';
+  }
+
+  @override
+  String get reminderHourBefore => '1 hour before';
+
+  @override
+  String get reminderDayBefore => '1 day before';
+
+  @override
+  String get markReminderHandled => 'Mark handled';
+
+  @override
+  String get restoreReminder => 'Restore in-app reminder';
+
+  @override
+  String get reminderHandled => 'In-app reminder marked handled';
+
+  @override
+  String get reminderRestored => 'In-app reminder restored';
+
+  @override
+  String get reminderUpcoming => 'Upcoming';
+
+  @override
+  String get reminderOverdue => 'Overdue';
+
+  @override
+  String get showWeekends => 'Show weekends';
+
+  @override
+  String get startHour => 'Start hour';
+
+  @override
+  String get endHour => 'End hour';
+
+  @override
+  String get timeGridDensity => 'Time grid density';
+
+  @override
+  String get importJsonFile => 'Import JSON file';
+
+  @override
+  String get pasteJson => 'Paste JSON';
+
+  @override
+  String get importGeneralSchedulesJsonTextDesc =>
+      'Import calendars from copied JSON';
+
+  @override
+  String get importIcsFile => 'Import ICS file';
+
+  @override
+  String get importIcsFileDesc => 'Read events from an .ics calendar file';
+
+  @override
+  String get pasteIcs => 'Paste ICS';
+
+  @override
+  String get pasteIcsDesc => 'Import events from copied calendar text';
+
+  @override
+  String get copyJson => 'Copy JSON';
+
+  @override
+  String get copyJsonDesc => 'Copy selected calendars as JSON text';
+
+  @override
+  String get shareIcs => 'Share ICS';
+
+  @override
+  String get shareIcsDesc => 'Share selected calendars as .ics';
+
+  @override
+  String get saveIcs => 'Save ICS';
+
+  @override
+  String get saveIcsDesc => 'Save selected calendars as .ics';
+
+  @override
+  String get copyIcs => 'Copy ICS';
+
+  @override
+  String get copyIcsDesc => 'Copy selected calendars as ICS text';
+
+  @override
+  String get importIcs => 'Import ICS';
+
+  @override
+  String get icsContent => 'ICS content';
+
+  @override
+  String get pasteIcsContentHint => 'Paste BEGIN:VCALENDAR content here';
+
+  @override
+  String importIcsPreviewPrompt(int count) {
+    return 'Found $count events. Import as a new calendar or replace the active calendar?';
+  }
+
+  @override
+  String importedSchedulesWithWarnings(int count, int warningCount) {
+    return 'Imported $count schedules with $warningCount warnings';
+  }
+
+  @override
+  String get importWarningSkippedMissingStart =>
+      'Skipped an event without a start time.';
+
+  @override
+  String get importWarningSkippedUnsupportedStart =>
+      'Skipped an event with an unsupported start time.';
+
+  @override
+  String get importWarningAdjustedEnd =>
+      'Adjusted an event whose end time was not after its start.';
+
+  @override
+  String importWarningUnsupportedFields(Object fields) {
+    return 'Unsupported ICS fields were added to notes: $fields';
+  }
+
+  @override
+  String importWarningUnsupportedRRuleFrequency(Object frequency) {
+    return 'Ignored unsupported repeat frequency: $frequency';
+  }
+
+  @override
+  String get selectCalendarsToCopyIcs => 'Select calendars to copy as ICS';
+
+  @override
+  String get selectCalendarsToExportIcs => 'Select calendars to export as ICS';
+
+  @override
+  String get exportIcsText => 'Export ICS text';
+
+  @override
+  String get exportJsonText => 'Export JSON text';
+
+  @override
+  String get dataRestoredFromBackupNotice =>
+      'App data was restored from the previous backup because the main file failed to load.';
+
+  @override
+  String get dataBackupRestoreFailedNotice =>
+      'Both the main data file and its backup are damaged. The app is now using a fresh state.';
+
+  @override
+  String get previousMonth => 'Previous month';
+
+  @override
+  String get nextMonth => 'Next month';
+
+  @override
+  String timeGridMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get reminderInProgress => 'In progress';
+
+  @override
+  String get deleteCourseTitle => 'Delete course';
+
+  @override
+  String get deleteCourseMessage => 'Delete this course?';
+
+  @override
+  String get showLunarCalendar => 'Show lunar calendar';
+
+  @override
+  String monthDayEvents(int day, int count) {
+    return '$day, $count events';
+  }
+
+  @override
+  String get defaultView => 'Default view';
+
+  @override
+  String get generalDefaultViewSection => 'Startup';
+
+  @override
+  String get generalScheduleDisplaySection => 'Schedule display';
+
+  @override
+  String get generalTimeGridSection => 'Time grid';
+
+  @override
+  String get generalPopupSection => 'Popup behavior';
+}
