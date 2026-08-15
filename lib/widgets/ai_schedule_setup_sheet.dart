@@ -164,10 +164,17 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
         FilledButton(
           onPressed: _running ? null : _run,
           child: _running
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text('排课中…'),
+                  ],
                 )
               : const Text('开始 AI 排课'),
         ),
@@ -175,6 +182,16 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_running)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                '正在请求 AI，网络较慢时可能需要 1-2 分钟，请稍候…',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           Text('学习强度', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<StudyIntensity>(

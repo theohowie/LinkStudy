@@ -55,7 +55,7 @@ class AiScheduleConfig {
     required this.apiKey,
     required this.model,
     this.windowDescription = '',
-    this.timeout = const Duration(seconds: 30),
+    this.timeout = const Duration(seconds: 120),
   });
 
   final AiProvider provider;
