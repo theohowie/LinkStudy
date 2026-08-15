@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../courses/ai_scheduler.dart';
 import '../widgets/sked_dropdown_menu.dart';
+
+/// DeepSeek 品牌蓝。
+const _deepseekBrandColor = Color(0xFF4D6BFE);
 
 /// AI 排课设置页：提供商（DeepSeek/OpenAI）、Base URL、API Key（加密存储）、模型（下拉选择）。
 class AiScheduleSettingsPage extends StatefulWidget {
@@ -99,16 +103,34 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<AiProvider>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: AiProvider.deepseek,
-                      icon: Icon(Icons.bolt_outlined),
-                      label: Text('DeepSeek'),
+                      icon: SvgPicture.asset(
+                        'assets/icons/deepseek.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter: const ColorFilter.mode(
+                          _deepseekBrandColor,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      label: const Text('DeepSeek'),
                     ),
                     ButtonSegment(
                       value: AiProvider.openai,
-                      icon: Icon(Icons.travel_explore_outlined),
-                      label: Text('OpenAI'),
+                      icon: SvgPicture.asset(
+                        'assets/icons/openai.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter: ColorFilter.mode(
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      label: const Text('OpenAI'),
                     ),
                   ],
                   selected: {_provider},

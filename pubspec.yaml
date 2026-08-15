@@ -29,6 +29,7 @@ dependencies:
   flutter_colorpicker: ^1.1.0
   lunar: ^1.7.8
   flutter_secure_storage: ^10.3.1
+  flutter_svg: ^2.2.1
 
 dev_dependencies:
   flutter_test:
@@ -45,6 +46,7 @@ flutter:
   assets:
     - assets/default_period_times.json
     - assets/school_sites.json
+    - assets/icons/
     - NOTICE
 
 flutter_launcher_icons:
