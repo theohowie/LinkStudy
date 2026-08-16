@@ -134,6 +134,49 @@ void main() {
       expect(aSlot.epochDay, bSlot.epochDay);
     });
 
+    test('课程内休息：同课拆多段，段间空隙即休息', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      // 100 分钟课：AI 拆成 50 + 休息10 + 50（09:00-09:50、10:00-10:50）。
+      final a = await store.addCourse(
+        url: 'https://example.com/break',
+        title: '数据结构',
+        durationMinutes: 100,
+      );
+      final result = await store.scheduleWithOrder(
+        courseIds: [a.id],
+        ordered: [(courseId: a.id, restAfterMinutes: 0)],
+        days: 7,
+        availabilityByWeekday: availability,
+        startFromNow: false,
+        aiPlacements: [
+          AiPlacement(
+            courseId: a.id,
+            dayOffset: 1,
+            startMinute: 9 * 60,
+            endMinute: 9 * 60 + 50,
+          ),
+          AiPlacement(
+            courseId: a.id,
+            dayOffset: 1,
+            startMinute: 10 * 60,
+            endMinute: 10 * 60 + 50,
+          ),
+        ],
+      );
+      expect(result.failures, isEmpty);
+      // 同课两段 → 两个槽位。
+      final slots =
+          store.slots.where((s) => s.courseId == a.id).toList()
+            ..sort((x, y) => x.startMinute.compareTo(y.startMinute));
+      expect(slots, hasLength(2));
+      expect(slots[0].startMinute, 9 * 60);
+      expect(slots[0].endMinute, 9 * 60 + 50);
+      // 段间空隙 09:50-10:00 即休息。
+      expect(slots[1].startMinute - slots[0].endMinute, 10);
+      expect(slots[1].endMinute, 10 * 60 + 50);
+    });
+
     test('AI 具体时间非法时回退本地贪心落位', () async {
       final store = LinkCourseStore.instance;
       store.debugClear();

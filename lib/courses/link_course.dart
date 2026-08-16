@@ -317,14 +317,17 @@ class LinkCourseStore extends ChangeNotifier {
     );
 
     // 阶段 A：优先采用 AI 给出的具体时间（校验合法性）。
-    final adopted = <String>{};
+    // 支持"课程内插入休息"：同一门课可拆为多段（同 courseId 多条 placement），
+    // 段间空隙即为休息；校验所有段的总时长不超过课程时长、各段不重叠且在窗口内。
+    final adoptedTotal = <String, int>{}; // courseId → 已采用的总时长(分钟)
     if (aiPlacements.isNotEmpty) {
       for (final p in aiPlacements) {
         final course = pending.where((c) => c.id == p.courseId).firstOrNull;
-        if (course == null || adopted.contains(p.courseId)) continue;
-        // 校验：窗口内天数、时长匹配、不与已采用槽位重叠。
+        if (course == null) continue;
+        // 校验：窗口内天数、该课程累计时长不超、不与已采用槽位重叠。
         if (p.dayOffset < 0 || p.dayOffset >= days.clamp(1, 30)) continue;
-        if (p.durationMinutes != course.durationMinutes) continue;
+        final usedTotal = adoptedTotal[p.courseId] ?? 0;
+        if (usedTotal + p.durationMinutes > course.durationMinutes) continue;
         final day = epochDayOf(today) + p.dayOffset;
         final weekday = localDateFromEpochDay(day).weekday;
         final overlaps = placements.any(
@@ -340,7 +343,7 @@ class LinkCourseStore extends ChangeNotifier {
               p.startMinute >= seg.startMinute && p.endMinute <= seg.endMinute,
         );
         if (!inWindow) continue;
-        adopted.add(p.courseId);
+        adoptedTotal[p.courseId] = usedTotal + p.durationMinutes;
         placements.add((
           courseId: p.courseId,
           day: day,
@@ -349,18 +352,38 @@ class LinkCourseStore extends ChangeNotifier {
           end: p.endMinute,
         ));
       }
-    }
-
-    // 阶段 B：未采用 AI 时间的课程按顺序贪心落位。
-    // 注意：occupied 必须包含阶段 A 已采用的槽位，否则本地落位会与 AI 落位重叠。
-    final pendingRest = pending.where((c) => !adopted.contains(c.id)).toList();
-    if (pendingRest.isNotEmpty) {
-      final occupiedMap = _occupiedFromSlots(_slots);
-      for (final p in placements) {
-        (occupiedMap[p.weekday] ??= []).add((start: p.start, end: p.end));
+      // 只有"已排满整门课"的课程才算采用（避免只用了 AI 部分片段却被当整门课跳过）。
+      final adopted = <String>{
+        for (final c in pending)
+          if ((adoptedTotal[c.id] ?? 0) >= c.durationMinutes) c.id,
+      };
+      // 阶段 B：未完全采用 AI 时间的课程按顺序贪心落位（补足剩余时长或整体重排）。
+      // 注意：occupied 必须包含阶段 A 已采用的槽位，否则本地落位会与 AI 落位重叠。
+      final pendingRest = pending
+          .where((c) => !adopted.contains(c.id))
+          .toList();
+      if (pendingRest.isNotEmpty) {
+        final occupiedMap = _occupiedFromSlots(_slots);
+        for (final p in placements) {
+          (occupiedMap[p.weekday] ??= []).add((start: p.start, end: p.end));
+        }
+        final result = scheduleCourses(
+          pending: pendingRest,
+          availabilityByWeekday: availabilityByWeekday,
+          occupied: occupiedMap,
+          today: today,
+          ordered: ordered.isEmpty ? null : ordered,
+          horizonDays: days.clamp(1, 30),
+          startFromNow: startFromNow,
+        );
+        placements.addAll(result.placements);
+        failures.addAll(result.failures);
       }
+    } else {
+      // 无 AI 具体时间 → 全部按顺序贪心落位。
+      final occupiedMap = _occupiedFromSlots(_slots);
       final result = scheduleCourses(
-        pending: pendingRest,
+        pending: pending,
         availabilityByWeekday: availabilityByWeekday,
         occupied: occupiedMap,
         today: today,

@@ -28,9 +28,16 @@ class AiScheduleConversation extends StatelessWidget {
     for (final courseId in task.courseIds) {
       final course = store.courseById(courseId);
       if (course == null) continue;
-      final slot = store.slots.where((s) => s.courseId == courseId).firstOrNull;
+      final slots = store.slots.where((s) => s.courseId == courseId).toList()
+        ..sort((a, b) {
+          final da = a.epochDay ?? 0;
+          final db = b.epochDay ?? 0;
+          return da != db
+              ? da.compareTo(db)
+              : a.startMinute.compareTo(b.startMinute);
+        });
       final title = course.title;
-      if (slot == null) {
+      if (slots.isEmpty) {
         rows.add(
           _row(
             title,
@@ -42,18 +49,23 @@ class AiScheduleConversation extends StatelessWidget {
         );
         continue;
       }
-      final date = slot.epochDay == null
-          ? null
-          : localDateFromEpochDay(slot.epochDay!);
+      // 多段（课程内插入休息）→ 显示为两截并用"休息"标记分隔。
+      final parts = [
+        for (final slot in slots)
+          () {
+            final date = slot.epochDay == null
+                ? null
+                : localDateFromEpochDay(slot.epochDay!);
+            return date == null
+                ? '${_timeLabel(slot.startMinute)}-${_timeLabel(slot.endMinute)}'
+                : '${_dateLabel(date)} ${_timeLabel(slot.startMinute)}-${_timeLabel(slot.endMinute)}';
+          }(),
+      ];
+      final trailingText = parts.join(slots.length > 1 ? ' ｜ 休息 ｜ ' : '');
       rows.add(
         _row(
           title,
-          trailing: Text(
-            date == null
-                ? '${_timeLabel(slot.startMinute)}-${_timeLabel(slot.endMinute)}'
-                : '${_dateLabel(date)} ${_timeLabel(slot.startMinute)}-${_timeLabel(slot.endMinute)}',
-            style: const TextStyle(fontSize: 13),
-          ),
+          trailing: Text(trailingText, style: const TextStyle(fontSize: 13)),
         ),
       );
     }
