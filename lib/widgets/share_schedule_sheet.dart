@@ -40,17 +40,33 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
   _ShareRange _range = _ShareRange.today;
   _ShareFormat _format = _ShareFormat.image;
 
+  /// 7 天范围的起始日期（默认今天）。
+  DateTime _startDate = normalizeDateOnly(DateTime.now());
+
   String get _rangeLabel => switch (_range) {
     _ShareRange.today => '当天日程',
-    _ShareRange.week7 => '未来 7 天日程',
+    _ShareRange.week7 => '${_dateLabel(_startDate)}起 7 天日程',
   };
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _startDate = normalizeDateOnly(picked));
+    }
+  }
+
+  static String _dateLabel(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   List<GeneralEventOccurrence> get _occurrences {
     final provider = widget.provider;
     final start = normalizeDateOnly(
-      _range == _ShareRange.today
-          ? provider.selectedGeneralDate
-          : DateTime.now(),
+      _range == _ShareRange.today ? provider.selectedGeneralDate : _startDate,
     );
     final end = start.add(Duration(days: _range == _ShareRange.today ? 1 : 7));
     return provider.generalOccurrencesForRange(
@@ -108,6 +124,7 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
     }
     final data = {
       'range': _range == _ShareRange.today ? 'today' : '7days',
+      if (_range == _ShareRange.week7) 'startDate': _dateLabel(_startDate),
       'events': [
         for (final o in list)
           {
@@ -221,6 +238,17 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
             selected: {_range},
             onSelectionChanged: (s) => setState(() => _range = s.first),
           ),
+          if (_range == _ShareRange.week7) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _pickStartDate,
+              icon: const Icon(Icons.calendar_month_outlined, size: 18),
+              label: Text('开始日期：$_dateLabel(_startDate)'),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Text('格式', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
