@@ -307,8 +307,9 @@ class _OccurrenceCard extends StatelessWidget {
 
                 if (dense || narrow || !title.showDetails) {
                   // 紧凑/窄屏也显示开始-结束时间（分两行：标题一行、时间一行）。
-                  // 标题字号保持不变、单行省略号截断；时间正常字号；
-                  // 格子矮时内容超出部分裁剪（不再整体缩放），保证时间始终可见。
+                  // 标题字号保持不变、单行省略号截断；时间字号调小且完整显示
+                  //（FittedBox 只在列太窄时整体缩小时间行，不截断文本）；
+                  // 格子矮时内容超出部分裁剪，时间始终可见。
                   return Align(
                     alignment: AlignmentDirectional.topStart,
                     child: LayoutBuilder(
@@ -328,11 +329,15 @@ class _OccurrenceCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: titleStyle,
                                 ),
-                                Text(
-                                  _formatOccurrenceTime(context, occurrence),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: detailStyle,
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: Text(
+                                    _formatOccurrenceTime(context, occurrence),
+                                    maxLines: 1,
+                                    style:
+                                        detailStyle?.copyWith(fontSize: 10),
+                                  ),
                                 ),
                               ],
                             ),
