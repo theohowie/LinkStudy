@@ -161,6 +161,32 @@ class AiScheduleProgressSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
+              // 流式思考过程：AI 实时输出（对话式展示）。
+              if (task.thinking.isNotEmpty) ...[
+                Text(
+                  'AI 的思考过程',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SingleChildScrollView(
+                    reverse: true,
+                    child: Text(
+                      task.thinking,
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // 思考过程：AI 的思路说明。
               if (task.aiReason != null && task.aiReason!.isNotEmpty) ...[
                 Text(

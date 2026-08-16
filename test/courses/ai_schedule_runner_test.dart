@@ -16,6 +16,8 @@ class _FakeScheduler extends AiScheduler {
     required AiSchedulePrefs prefs,
     required AiScheduleConfig config,
     required String localeCode,
+    void Function(String delta)? onToken,
+    void Function(int promptTokens, int completionTokens)? onUsage,
   }) async {
     return outcome;
   }

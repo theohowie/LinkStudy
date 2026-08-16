@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../platform/overlay_client.dart';
@@ -41,6 +43,9 @@ class AiScheduleTask {
   int failureCount = 0;
   String? error;
   DateTime? finishedAt;
+
+  /// 流式思考过程：AI 生成的原始输出（实时累积，进度面板对话式展示）。
+  String thinking = '';
 
   /// 结果是否已被用户查看过（控制排课按钮是否优先打开进度面板）。
   bool viewed = false;
@@ -144,6 +149,19 @@ class AiScheduleRunner extends ChangeNotifier {
         prefs: prefs,
         config: requestConfig,
         localeCode: localeCode,
+        onToken: (delta) {
+          task.thinking += delta;
+          notifyListeners();
+        },
+        onUsage: (prompt, completion) {
+          // 记录 token 用量（按 provider+model 累计）。
+          unawaited(AiUsageStats.instance.record(
+            provider: config.provider,
+            model: config.model,
+            promptTokens: prompt,
+            completionTokens: completion,
+          ));
+        },
       );
 
       switch (outcome) {

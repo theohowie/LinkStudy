@@ -206,11 +206,16 @@ class AiScheduler {
   }
 
   /// 请求 AI 排课。
+  ///
+  /// [onToken] 非空时启用流式输出（SSE），AI 生成的文本逐块回调（思考过程实时可见）。
+  /// [onUsage] 请求完成后回调 token 用量（prompt/completion），用于用量统计。
   Future<AiScheduleOutcome> schedule({
     required List<LinkCourse> courses,
     required AiSchedulePrefs prefs,
     required AiScheduleConfig config,
     required String localeCode,
+    void Function(String delta)? onToken,
+    void Function(int promptTokens, int completionTokens)? onUsage,
   }) async {
     if (config.apiKey.trim().isEmpty || config.baseUrl.trim().isEmpty) {
       return AiScheduleOutcomeError(
@@ -229,35 +234,32 @@ class AiScheduler {
     final uri = Uri.parse(
       '${config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/chat/completions',
     );
-    final body = jsonEncode({
-      'model': config.model.trim(),
-      'temperature': 0.3,
-      'messages': [
-        {'role': 'system', 'content': aiScheduleSystemPrompt},
-        {
-          'role': 'user',
-          'content': _buildUserPrompt(
-            courses: courses,
-            prefs: prefs,
-            window: config.windowDescription,
-            localeCode: localeCode,
-          ),
-        },
-      ],
-    });
+    final request = http.Request('POST', uri)
+      ..headers.addAll({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${config.apiKey.trim()}',
+      })
+      ..body = jsonEncode({
+        'model': config.model.trim(),
+        'temperature': 0.3,
+        if (onToken != null) 'stream': true,
+        'messages': [
+          {'role': 'system', 'content': aiScheduleSystemPrompt},
+          {
+            'role': 'user',
+            'content': _buildUserPrompt(
+              courses: courses,
+              prefs: prefs,
+              window: config.windowDescription,
+              localeCode: localeCode,
+            ),
+          },
+        ],
+      });
 
-    final http.Response response;
+    final http.StreamedResponse streamed;
     try {
-      response = await _client
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ${config.apiKey.trim()}',
-            },
-            body: body,
-          )
-          .timeout(config.timeout);
+      streamed = await _client.send(request).timeout(config.timeout);
     } on TimeoutException {
       return AiScheduleOutcomeError(
         AiScheduleError(
@@ -295,15 +297,68 @@ class AiScheduler {
       );
     }
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      final body = await streamed.stream.bytesToString();
       return AiScheduleOutcomeError(
         AiScheduleError(
           type: AiScheduleErrorType.http,
-          message: 'AI 接口返回错误（HTTP ${response.statusCode}）：${_trimBody(response.body)}',
+          message: 'AI 接口返回错误（HTTP ${streamed.statusCode}）：${_trimBody(body)}',
         ),
       );
     }
 
+    if (onToken != null) {
+      // 流式：逐块回调 AI 输出，最后按累积内容解析结果。
+      final String content;
+      var promptTokens = 0;
+      var completionTokens = 0;
+      try {
+        final consumed = await _consumeStream(
+          streamed,
+          config.timeout,
+          onToken,
+        );
+        if (consumed == null) {
+          return AiScheduleOutcomeError(
+            AiScheduleError(
+              type: AiScheduleErrorType.network,
+              message: 'AI 流式响应中断（${config.baseUrl.trim()}），请重试',
+            ),
+          );
+        }
+        content = consumed.content;
+        promptTokens = consumed.promptTokens;
+        completionTokens = consumed.completionTokens;
+      } on TimeoutException {
+        return AiScheduleOutcomeError(
+          AiScheduleError(
+            type: AiScheduleErrorType.network,
+            message: 'AI 响应超时（${config.timeout.inSeconds} 秒）：${config.baseUrl.trim()}',
+          ),
+        );
+      } catch (e) {
+        debugPrint('[ai_scheduler] stream failed: $e');
+        return AiScheduleOutcomeError(
+          AiScheduleError(
+            type: AiScheduleErrorType.network,
+            message: 'AI 流式响应失败：$e',
+          ),
+        );
+      }
+      onUsage?.call(promptTokens, completionTokens);
+      final parsed = _parseContent(content);
+      if (parsed == null || parsed.ordered.isEmpty) {
+        return AiScheduleOutcomeError(
+          AiScheduleError(
+            type: AiScheduleErrorType.parse,
+            message: 'AI 返回内容无法解析，请重试或更换模型',
+          ),
+        );
+      }
+      return AiScheduleOutcomeSuccess(parsed);
+    }
+
+    final response = await http.Response.fromStream(streamed);
     final parsed = _parseResponse(response.body);
     if (parsed == null) {
       return AiScheduleOutcomeError(
@@ -318,7 +373,74 @@ class AiScheduler {
         AiScheduleError(type: AiScheduleErrorType.empty, message: 'AI 没有返回任何课程顺序'),
       );
     }
+    final usage = _extractUsage(response.body);
+    onUsage?.call(usage.$1, usage.$2);
     return AiScheduleOutcomeSuccess(parsed);
+  }
+
+  /// 读取 SSE 流式响应，逐块回调增量内容，返回累积内容与 usage。
+  Future<({String content, int promptTokens, int completionTokens})?> _consumeStream(
+    http.StreamedResponse resp,
+    Duration timeout,
+    void Function(String delta) onToken,
+  ) async {
+    final buffer = StringBuffer();
+    var promptTokens = 0;
+    var completionTokens = 0;
+    try {
+      await for (final line in resp.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .timeout(timeout)) {
+        final trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        final data = trimmed.substring(5).trim();
+        if (data == '[DONE]') break;
+        if (!data.startsWith('{')) continue;
+        try {
+          final obj = jsonDecode(data);
+          final choices = obj['choices'];
+          if (choices is List && choices.isNotEmpty) {
+            final delta = choices.first['delta'];
+            if (delta is Map) {
+              final content = delta['content'];
+              if (content is String && content.isNotEmpty) {
+                buffer.write(content);
+                onToken(content);
+              }
+            }
+          }
+          final usage = obj['usage'];
+          if (usage is Map) {
+            promptTokens = (usage['prompt_tokens'] as num?)?.toInt() ?? 0;
+            completionTokens = (usage['completion_tokens'] as num?)?.toInt() ?? 0;
+          }
+        } catch (_) {}
+      }
+      return (
+        content: buffer.toString(),
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+      );
+    } catch (e) {
+      debugPrint('[ai_scheduler] stream read failed: $e');
+      return null;
+    }
+  }
+
+  /// 从响应体提取 usage（prompt/completion tokens），失败返回 (0, 0)。
+  (int, int) _extractUsage(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return (0, 0);
+      final usage = decoded['usage'];
+      if (usage is! Map) return (0, 0);
+      final prompt = (usage['prompt_tokens'] as num?)?.toInt() ?? 0;
+      final completion = (usage['completion_tokens'] as num?)?.toInt() ?? 0;
+      return (prompt, completion);
+    } catch (_) {
+      return (0, 0);
+    }
   }
 
   /// 网络诊断：GET 根路径 + 三个尺寸的 POST（300B/1200B/2500B）。
@@ -558,5 +680,138 @@ class AiScheduleSettings {
   Future<void> saveSetupPrefs(AiSchedulePrefs prefs) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_setupPrefsKey, jsonEncode(prefs.toJson()));
+  }
+}
+
+/// 单个模型的用量统计。
+class AiModelUsage {
+  const AiModelUsage({
+    required this.provider,
+    required this.model,
+    required this.requests,
+    required this.promptTokens,
+    required this.completionTokens,
+  });
+
+  final String provider;
+  final String model;
+  final int requests;
+  final int promptTokens;
+  final int completionTokens;
+
+  int get totalTokens => promptTokens + completionTokens;
+}
+
+/// 模型价格（美元/百万 token），用于估算花费（仅作参考）。
+double _inputPricePerMillion(String model) => switch (model) {
+      'deepseek-v4-flash' => 0.1,
+      'deepseek-v4-pro' => 0.5,
+      'gpt-5.6-luna' => 0.4,
+      'gpt-5.6-terra' => 1.0,
+      'gpt-5.6-sol' => 2.5,
+      _ => 1.0,
+    };
+
+double _outputPricePerMillion(String model) => switch (model) {
+      'deepseek-v4-flash' => 0.4,
+      'deepseek-v4-pro' => 2.0,
+      'gpt-5.6-luna' => 1.6,
+      'gpt-5.6-terra' => 4.0,
+      'gpt-5.6-sol' => 10.0,
+      _ => 4.0,
+    };
+
+/// 估算一次用量的花费（美元）。
+double estimateCostInUsd(AiModelUsage usage) {
+  return usage.promptTokens / 1e6 * _inputPricePerMillion(usage.model) +
+      usage.completionTokens / 1e6 * _outputPricePerMillion(usage.model);
+}
+
+/// AI 用量统计：按模型累计 token 与请求次数，本地持久化。
+/// 供设置页展示"已用 token / 花费"，帮助小白用户了解用量。
+class AiUsageStats {
+  AiUsageStats._();
+
+  static final AiUsageStats instance = AiUsageStats._();
+
+  static const _key = 'ai_usage_stats';
+
+  bool _loaded = false;
+  final Map<String, Map<String, dynamic>> _stats = {};
+
+  Future<void> ensureLoaded() async {
+    if (_loaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          for (final e in decoded.entries) {
+            final v = e.value;
+            if (v is Map) {
+              _stats[e.key.toString()] = v.map(
+                (k, vv) => MapEntry(k.toString(), vv),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[ai_scheduler] usage stats decode failed: $e');
+      }
+    }
+    _loaded = true;
+  }
+
+  /// 记录一次请求的 token 用量。
+  Future<void> record({
+    required AiProvider provider,
+    required String model,
+    required int promptTokens,
+    required int completionTokens,
+  }) async {
+    await ensureLoaded();
+    final entry = _stats[model] ?? <String, dynamic>{};
+    entry['provider'] = provider.name;
+    entry['requests'] = ((entry['requests'] as num?)?.toInt() ?? 0) + 1;
+    entry['promptTokens'] =
+        ((entry['promptTokens'] as num?)?.toInt() ?? 0) + promptTokens;
+    entry['completionTokens'] =
+        ((entry['completionTokens'] as num?)?.toInt() ?? 0) + completionTokens;
+    _stats[model] = entry;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(_stats));
+  }
+
+  /// 各模型用量（按 token 总量降序）。
+  List<AiModelUsage> get entries {
+    final result = [
+      for (final e in _stats.entries)
+        AiModelUsage(
+          provider: e.value['provider'] as String? ?? '',
+          model: e.key,
+          requests: (e.value['requests'] as num?)?.toInt() ?? 0,
+          promptTokens: (e.value['promptTokens'] as num?)?.toInt() ?? 0,
+          completionTokens:
+              (e.value['completionTokens'] as num?)?.toInt() ?? 0,
+        ),
+    ]..sort((a, b) => b.totalTokens.compareTo(a.totalTokens));
+    return result;
+  }
+
+  int get totalRequests =>
+      entries.fold(0, (sum, e) => sum + e.requests);
+
+  int get totalTokens => entries.fold(0, (sum, e) => sum + e.totalTokens);
+
+  double get totalCostUsd =>
+      entries.fold(0.0, (sum, e) => sum + estimateCostInUsd(e));
+
+  /// 仅测试用：清空统计。
+  @visibleForTesting
+  Future<void> debugReset() async {
+    _stats.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
   }
 }

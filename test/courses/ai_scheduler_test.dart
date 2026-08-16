@@ -8,6 +8,21 @@ import 'package:linkstudy/courses/link_course.dart';
 import 'package:linkstudy/services/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class _StreamingClient extends http.BaseClient {
+  _StreamingClient(this.sse);
+
+  final String sse;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    return http.StreamedResponse(
+      http.ByteStream.fromBytes(utf8.encode(sse)),
+      200,
+      headers: {'content-type': 'text/event-stream'},
+    );
+  }
+}
+
 class _FakeSecretStore implements SecretStore {
   String aiKey = '';
 
@@ -221,6 +236,60 @@ void main() {
       expect(bytes, lessThan(1500), reason: '请求体 $bytes 字节过大，MTU 黑洞下会被丢弃');
     });
 
+    test('流式输出：onToken 逐块回调并正确解析结果', () async {
+      final sse = [
+        'data: {"choices":[{"delta":{"content":"{\\"order\\":"}}]}',
+        'data: {"choices":[{"delta":{"content":"[{\\"courseId\\":\\"a\\"}]}"}}]}',
+        'data: [DONE]',
+      ].join('\n');
+      final tokens = <String>[];
+      final outcome = await AiScheduler(client: _StreamingClient(sse)).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+        onToken: tokens.add,
+      );
+      final success = outcome as AiScheduleOutcomeSuccess;
+      expect(success.value.ordered.single.courseId, 'a');
+      expect(tokens, isNotEmpty);
+      expect(tokens.join(), contains('courseId'));
+    });
+
+    test('usage 回调返回 prompt/completion tokens', () async {
+      int? prompt;
+      int? completion;
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":0}],"reason":"x"}',
+                },
+              },
+            ],
+            'usage': {'prompt_tokens': 123, 'completion_tokens': 45},
+          }),
+          200,
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+        onUsage: (p, c) {
+          prompt = p;
+          completion = c;
+        },
+      );
+      expect(outcome, isA<AiScheduleOutcomeSuccess>());
+      expect(prompt, 123);
+      expect(completion, 45);
+    });
+
     test('未配置 API Key 返回 notConfigured（不发请求）', () async {
       var requested = false;
       final client = MockClient((request) async {
@@ -362,6 +431,52 @@ void main() {
       expect(loaded.apiKey, 'sk-secret');
       expect(loaded.windowDescription, '09:00-18:00');
       expect(store.aiKey, 'sk-secret');
+    });
+  });
+
+  group('AiUsageStats', () {
+    test('按模型累计 token 与请求次数', () async {
+      await AiUsageStats.instance.debugReset();
+      await AiUsageStats.instance.record(
+        provider: AiProvider.deepseek,
+        model: 'deepseek-v4-flash',
+        promptTokens: 100,
+        completionTokens: 50,
+      );
+      await AiUsageStats.instance.record(
+        provider: AiProvider.deepseek,
+        model: 'deepseek-v4-flash',
+        promptTokens: 200,
+        completionTokens: 100,
+      );
+      await AiUsageStats.instance.record(
+        provider: AiProvider.openai,
+        model: 'gpt-5.6-sol',
+        promptTokens: 10,
+        completionTokens: 5,
+      );
+      final entries = AiUsageStats.instance.entries;
+      expect(entries, hasLength(2));
+      final flash =
+          entries.singleWhere((e) => e.model == 'deepseek-v4-flash');
+      expect(flash.requests, 2);
+      expect(flash.promptTokens, 300);
+      expect(flash.completionTokens, 150);
+      expect(AiUsageStats.instance.totalTokens, 465);
+      expect(AiUsageStats.instance.totalRequests, 3);
+      // 花费为正的估算值。
+      expect(AiUsageStats.instance.totalCostUsd, greaterThan(0));
+    });
+
+    test('估算花费按模型价格计算', () {
+      const usage = AiModelUsage(
+        provider: 'deepseek',
+        model: 'deepseek-v4-flash',
+        requests: 1,
+        promptTokens: 1000000,
+        completionTokens: 1000000,
+      );
+      expect(estimateCostInUsd(usage), closeTo(0.5, 0.001));
     });
   });
 
