@@ -76,8 +76,8 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
                       !schedule.isVisible,
                     ),
                   ),
-                  onRename: () => _renameCalendar(context, schedule),
-                  onDelete: () => _deleteCalendar(context, schedule),
+                  onRename: () => _renameCalendar(schedule),
+                  onDelete: () => _deleteCalendar(schedule),
                 );
               },
             ),
@@ -112,15 +112,14 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
     }
   }
 
-  Future<void> _renameCalendar(
-    BuildContext context,
-    GeneralSchedule schedule,
-  ) async {
+  Future<void> _renameCalendar(GeneralSchedule schedule) async {
     await _runCalendarAction(() async {
       final provider = context.read<TimetableProvider>();
       final controller = TextEditingController(text: schedule.name);
       final name = await showExpressiveDialog<String>(
         context: context,
+        // 与日历管理 sheet 同一 Navigator,避免跨 Navigator 弹窗导致依赖清理时序错乱。
+        useRootNavigator: false,
         builder: (dialogContext) {
           final l10n = AppLocalizations.of(dialogContext);
           var popped = false;
@@ -154,21 +153,21 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
         },
       );
       controller.dispose();
+      if (!mounted) return;
       if (name != null && name.trim().isNotEmpty) {
         await provider.renameGeneralSchedule(schedule.id, name);
       }
     });
   }
 
-  Future<void> _deleteCalendar(
-    BuildContext context,
-    GeneralSchedule schedule,
-  ) async {
+  Future<void> _deleteCalendar(GeneralSchedule schedule) async {
     await _runCalendarAction(() async {
       final provider = context.read<TimetableProvider>();
       final l10n = AppLocalizations.of(context);
       final confirmed = await showExpressiveDialog<bool>(
         context: context,
+        // 与日历管理 sheet 同一 Navigator。
+        useRootNavigator: false,
         builder: (dialogContext) {
           var popped = false;
           void popWith(bool value) {
@@ -196,6 +195,7 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
           );
         },
       );
+      if (!mounted) return;
       if (confirmed == true) {
         await provider.deleteGeneralSchedule(schedule.id);
       }
