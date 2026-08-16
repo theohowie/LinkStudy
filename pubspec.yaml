@@ -49,6 +49,7 @@ flutter:
     - assets/school_sites.json
     - assets/icons/
     - assets/schemes/
+    - assets/prompts/
     - NOTICE
 
 flutter_launcher_icons:
