@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 排课原理</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --text: #1c1e26;
+    --muted: #6b7280;
+    --primary: #4d6bfe;
+    --primary-soft: #eef1ff;
+    --green: #22a06b;
+    --orange: #e8590c;
+    --purple: #9c36b5;
+    --red: #e03131;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 16px 14px 40px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #4d6bfe 0%, #7c5cff 100%);
+    border-radius: 20px;
+    padding: 24px 20px;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .hero h1 { font-size: 22px; margin-bottom: 6px; }
+  .hero p { font-size: 13px; opacity: .9; }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .step-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 12px; font-weight: 700; color: #fff; margin-right: 8px;
+  }
+  .card h2 { font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; }
+  .card h3 { font-size: 14px; margin: 10px 0 4px; color: var(--muted); font-weight: 600; }
+  .card p, .card li { font-size: 13.5px; color: #3a3f4b; }
+  .card ul { padding-left: 18px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-right: 6px; }
+  .tag-blue { background: var(--primary-soft); color: var(--primary); }
+  .tag-green { background: #e6f7ef; color: var(--green); }
+  .tag-orange { background: #fff1e6; color: var(--orange); }
+  .tag-purple { background: #f6e9fb; color: var(--purple); }
+  .tag-red { background: #ffe9e9; color: var(--red); }
+  .formula {
+    background: #f0f2f8; border-radius: 10px; padding: 10px 12px;
+    font-family: "SF Mono", Consolas, monospace; font-size: 12.5px;
+    margin: 8px 0; color: #2a2f3a; overflow-x: auto; white-space: nowrap;
+  }
+  .divider { height: 1px; background: #e8eaf0; margin: 12px 0; }
+  .flow {
+    display: flex; flex-direction: column; gap: 6px; margin: 10px 0;
+  }
+  .flow-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #f8f9fc; border-radius: 10px; padding: 8px 12px; font-size: 13px;
+  }
+  .flow-item .n {
+    width: 20px; height: 20px; border-radius: 50%; background: var(--primary);
+    color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-weight: 700;
+  }
+  .arrow { text-align: center; color: var(--muted); font-size: 14px; }
+  .foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🧠 AI 智能排课原理</h1>
+  <p>四个算法协同工作,让每一分钟学习都高效</p>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge" style="background:var(--primary)">1</span>优先系数计算 <span class="tag tag-blue">AHP 层次分析法</span></h2>
+  <p>为每门课评估<b>难度</b>与<b>重要程度</b>(1-9 分),再结合<b>截止日期</b>计算综合优先系数 P_i。分数越高,越优先获得好时段。</p>
+  <h3>核心公式</h3>
+  <div class="formula">w_重要 = a / (a+1) &nbsp;·&nbsp; w_难度 = 1 / (a+1)</div>
+  <div class="formula">P_i = (w·n_难度 + w·n_重要 + w_紧迫·n_紧迫) / 权重和</div>
+  <ul>
+    <li>默认 a=3,重要程度权重 75%</li>
+    <li>截止越近,紧迫度权重越高</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge" style="background:var(--green)">2</span>可用时间片生成</h2>
+  <p>把每天的时间窗切成 30 分钟粒度的小块,再用布尔"与"运算排除不可用时间(午休、已排日程、有事时段)。</p>
+  <div class="flow">
+    <div class="flow-item"><span class="n">1</span>切分时间窗 → N 个时间片</div>
+    <div class="arrow">↓</div>
+    <div class="flow-item"><span class="n">2</span>不可用时间"与"运算排除</div>
+    <div class="arrow">↓</div>
+    <div class="flow-item"><span class="n">3</span>剩余时间片 = 课程唯一可放位置</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge" style="background:var(--orange)">3</span>强度档位匹配 <span class="tag tag-orange">学习科学</span></h2>
+  <p>三档强度不是简单学久学短,而是依据实证研究的最优排布:</p>
+  <ul>
+    <li><span class="tag tag-red">高强度</span>峰值时段 + 单次 ≤50min + 每日 ≤90min <span style="color:var(--muted)">(同步效应/番茄工作法)</span></li>
+    <li><span class="tag tag-purple">中等</span>间隔 1-2 天复习 <span style="color:var(--muted)">(Cepeda 2006 间隔效应)</span></li>
+    <li><span class="tag tag-green">轻松</span>碎片填缝,5-15min 微学习 <span style="color:var(--muted)">(认知负荷理论)</span></li>
+  </ul>
+  <div class="divider"></div>
+  <h3>时段适配</h3>
+  <ul>
+    <li>🌅 <b>上午</b>:记忆类(背单词、背诵、口语)</li>
+    <li>☀️ <b>下午</b>:理解/练习类(算法、编程、习题)</li>
+    <li>🌙 <b>晚上</b>:复习/巩固类(复盘、错题、轻松阅读)</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge" style="background:var(--purple)">4</span>贪心分配调度 <span class="tag tag-purple">碎片回收</span></h2>
+  <p>按优先系数降序,重要课程先选最佳时段;长课在同一连续时段内拆段并插入休息。</p>
+  <div class="flow">
+    <div class="flow-item"><span class="n">1</span>课程按 P_i 降序排列</div>
+    <div class="arrow">↓</div>
+    <div class="flow-item"><span class="n">2</span>高优先课程先挑合适时间片</div>
+    <div class="arrow">↓</div>
+    <div class="flow-item"><span class="n">3</span>收集休息间隙/碎片 → 回填轻松课</div>
+    <div class="arrow">↓</div>
+    <div class="flow-item"><span class="n">4</span>放不下则按低优先裁剪并提示</div>
+  </div>
+  <div class="divider"></div>
+  <h3>课程内休息</h3>
+  <p>长课(≥90min)在同一连续时段内拆分,段间插入 5-10 分钟休息。如 180 分钟课 = 50+休10+50+休10+50+休10+50。</p>
+</div>
+
+<div class="foot">LinkStudy · AI 排课算法原理 · 本地渲染</div>
+
+</body>
+</html>

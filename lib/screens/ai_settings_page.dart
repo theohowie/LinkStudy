@@ -340,14 +340,17 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                   style: TextStyle(fontSize: 11, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
-                // 创建 API Key 快捷跳转。
-                OutlinedButton.icon(
+                // 创建 API Key 快捷跳转（与 OpenAI 直达链接同款式）。
+                TextButton.icon(
                   onPressed: () => _openApiKeyPage(_provider),
-                  icon: const Icon(Icons.vpn_key_outlined),
+                  icon: const Icon(Icons.open_in_new, size: 16),
                   label: Text(
                     _provider == AiProvider.deepseek
-                        ? '去 DeepSeek 创建 API Key'
-                        : '去 OpenAI 创建 API Key',
+                        ? 'DeepSeek API Key 直达链接'
+                        : 'OpenAI API Key 直达链接',
+                  ),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
                 const SizedBox(height: 8),

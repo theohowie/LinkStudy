@@ -105,7 +105,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: l10n.addCourse,
+            tooltip: l10n.addEvent,
             onPressed: _editorSheetOpen
                 ? null
                 : () => _openEditor(context, provider),

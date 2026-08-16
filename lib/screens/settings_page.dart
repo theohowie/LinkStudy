@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/text_transfer_widgets.dart';
+import '../widgets/algorithm_principle_page.dart';
 import '../data/timetable_storage.dart';
 import '../l10n/app_locale.dart';
 import '../l10n/app_localizations.dart';
@@ -59,6 +60,7 @@ enum _SettingsFlow {
   appDataActions,
   overlaySettings,
   aiScheduleSettings,
+  algorithmPrinciple,
   privacyPolicy,
   licensesPage,
   updateCheck,
@@ -343,9 +345,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 _RecoveryNoticeTile(status: provider.lastRecoveryStatus),
                 const SizedBox(height: 8),
               ],
-              SettingsSectionHeader(
-                title: l10n.settingsSectionGeneralSchedule,
-              ),
+              SettingsSectionHeader(title: l10n.settingsSectionGeneralSchedule),
               SettingsListTile(
                 leading: const Icon(Icons.grid_view_outlined),
                 title: l10n.generalDisplaySettings,
@@ -440,6 +440,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     : () => _showAppDataActions(provider),
               ),
               SettingsListTile(
+                leading: const Icon(Icons.psychology_outlined),
+                title: 'AI 排课原理',
+                subtitle: '四个算法如何协同工作（本地 HTML 介绍）',
+                trailing: const Icon(Icons.keyboard_arrow_right),
+                onTap: _isFlowOpen(_SettingsFlow.algorithmPrinciple)
+                    ? null
+                    : _openAlgorithmPrinciplePage,
+              ),
+              SettingsListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
                 title: l10n.privacyPolicyTitle,
                 subtitle: provider.acceptedPrivacyPolicyVersion == null
@@ -516,7 +525,8 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!mounted) return;
     setState(() {
       _overlayEnabled = prefs.getBool(_overlayEnabledKey) ?? false;
-      _overlayStyle = prefs.getString(overlayPrefsStyleKey) ?? overlayStyleCapsuleBlack;
+      _overlayStyle =
+          prefs.getString(overlayPrefsStyleKey) ?? overlayStyleCapsuleBlack;
       _overlayOpacity = prefs.getInt(overlayPrefsOpacityKey) ?? 100;
     });
   }
@@ -524,9 +534,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _openOverlaySettingsPage() async {
     await _guardFlow(_SettingsFlow.overlaySettings, () async {
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const OverlaySettingsPage(),
-        ),
+        MaterialPageRoute<void>(builder: (_) => const OverlaySettingsPage()),
       );
       // 返回后刷新样式/透明度摘要
       await _loadOverlayState();
@@ -536,9 +544,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _openAiScheduleSettingsPage() async {
     await _guardFlow(_SettingsFlow.aiScheduleSettings, () async {
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const AiScheduleSettingsPage(),
-        ),
+        MaterialPageRoute<void>(builder: (_) => const AiScheduleSettingsPage()),
       );
     });
   }
@@ -554,9 +560,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (!granted) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('需要"显示在其他应用上层"权限才能启用悬浮窗'),
-              ),
+              const SnackBar(content: Text('需要"显示在其他应用上层"权限才能启用悬浮窗')),
             );
           }
           await client.openPermissionSettings();
@@ -576,9 +580,9 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (e) {
       debugPrint('overlay toggle failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('悬浮窗操作失败，请重试')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('悬浮窗操作失败，请重试')));
       }
     } finally {
       if (mounted) setState(() => _overlayBusy = false);
@@ -655,6 +659,14 @@ class _SettingsPageState extends State<SettingsPage> {
       normalizedCode,
       l10n: AppLocalizations.of(context),
     );
+  }
+
+  Future<void> _openAlgorithmPrinciplePage() async {
+    await _guardFlow(_SettingsFlow.algorithmPrinciple, () async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const AlgorithmPrinciplePage()),
+      );
+    });
   }
 
   Future<void> _openPrivacyPolicyPage() async {
@@ -1940,7 +1952,8 @@ class _SelectionToolbar extends StatelessWidget {
         TextButton(
           onPressed: onClear,
           child: Text(AppLocalizations.of(context).clear),
-        ),      ],
+        ),
+      ],
     );
   }
 }
@@ -2008,9 +2021,7 @@ class _SelectableExportTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Icon(
-                selected
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: selected ? colors.primary : colors.outlineVariant,
               ),
             ],

@@ -50,6 +50,7 @@ flutter:
     - assets/icons/
     - assets/schemes/
     - assets/prompts/
+    - assets/algorithm_principles.html
     - NOTICE
 
 flutter_launcher_icons:
