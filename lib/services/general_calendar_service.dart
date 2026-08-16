@@ -119,6 +119,7 @@ class GeneralCalendarService {
     int? lunchStartMinute,
     int? lunchEndMinute,
     int? timeGridMinutes,
+    int? timelineUnitMinutes,
     bool? closeEventPopupOnOutsideTap,
   }) {
     return data.copyWith(
@@ -130,6 +131,7 @@ class GeneralCalendarService {
       lunchStartMinute: lunchStartMinute,
       lunchEndMinute: lunchEndMinute,
       timeGridMinutes: timeGridMinutes,
+      timelineUnitMinutes: timelineUnitMinutes,
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
     );
   }

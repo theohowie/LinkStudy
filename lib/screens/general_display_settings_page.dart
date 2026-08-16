@@ -82,10 +82,9 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   context,
                   provider,
                   initialMinute: provider.generalDayStartMinute,
-                  onPicked: (minute) =>
-                      provider.updateGeneralDisplaySettings(
-                        dayStartMinute: minute,
-                      ),
+                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
+                    dayStartMinute: minute,
+                  ),
                 ),
               ),
               _TimeSettingTile(
@@ -96,10 +95,9 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   context,
                   provider,
                   initialMinute: provider.generalDayEndMinute,
-                  onPicked: (minute) =>
-                      provider.updateGeneralDisplaySettings(
-                        dayEndMinute: minute,
-                      ),
+                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
+                    dayEndMinute: minute,
+                  ),
                 ),
               ),
               _TimeSettingTile(
@@ -110,10 +108,9 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   context,
                   provider,
                   initialMinute: provider.generalLunchStartMinute,
-                  onPicked: (minute) =>
-                      provider.updateGeneralDisplaySettings(
-                        lunchStartMinute: minute,
-                      ),
+                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
+                    lunchStartMinute: minute,
+                  ),
                 ),
               ),
               _TimeSettingTile(
@@ -124,10 +121,9 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   context,
                   provider,
                   initialMinute: provider.generalLunchEndMinute,
-                  onPicked: (minute) =>
-                      provider.updateGeneralDisplaySettings(
-                        lunchEndMinute: minute,
-                      ),
+                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
+                    lunchEndMinute: minute,
+                  ),
                 ),
               ),
               Padding(
@@ -160,6 +156,12 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   },
                 ),
               ),
+              _TimelinePrecisionTile(
+                value: provider.generalTimelineUnitMinutes,
+                onChanged: (value) => provider.updateGeneralDisplaySettings(
+                  timelineUnitMinutes: value,
+                ),
+              ),
               SettingsSectionHeader(title: l10n.generalPopupSection),
               SettingsSwitchTile(
                 icon: Icons.open_in_full_outlined,
@@ -173,6 +175,124 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// 时间线时间精度设置：滑块无级调节(5-480 分钟/刻度)，也可直接输入数字。
+class _TimelinePrecisionTile extends StatefulWidget {
+  const _TimelinePrecisionTile({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_TimelinePrecisionTile> createState() => _TimelinePrecisionTileState();
+}
+
+class _TimelinePrecisionTileState extends State<_TimelinePrecisionTile> {
+  late final TextEditingController _controller = TextEditingController(
+    text: '${widget.value}',
+  );
+
+  @override
+  void didUpdateWidget(covariant _TimelinePrecisionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    final parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null) {
+      _controller.text = '${widget.value}';
+      return;
+    }
+    final clamped = parsed.clamp(5, 480);
+    if (clamped != parsed) {
+      _controller.text = '$clamped';
+    }
+    widget.onChanged(clamped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.zoom_in_map_outlined, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '时间精度（分钟/刻度）',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 88,
+                child: TextField(
+                  controller: _controller,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    suffixText: '分',
+                  ),
+                  onSubmitted: (_) => _commit(),
+                  onEditingComplete: _commit,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '当前：${widget.value} 分钟/刻度'
+            '（${widget.value >= 60 ? '${widget.value ~/ 60} 小时' : ''}'
+            '${widget.value < 60
+                ? ''
+                : widget.value % 60 == 0
+                ? ''
+                : ' ${widget.value % 60} 分'}'
+            '${widget.value < 60 ? '$widget.value 分钟' : ''}）'
+            ' · 放大最小 5 分钟，缩小最大 8 小时',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Slider(
+            value: widget.value.toDouble(),
+            min: 5,
+            max: 480,
+            divisions: 475,
+            label: '${widget.value} 分钟',
+            onChanged: (v) => widget.onChanged(v.round()),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('5 分', style: theme.textTheme.labelSmall),
+              Text('1 小时', style: theme.textTheme.labelSmall),
+              Text('8 小时', style: theme.textTheme.labelSmall),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

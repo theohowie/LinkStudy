@@ -47,8 +47,12 @@ class _WeekCalendarViewState extends State<_WeekCalendarView> {
   late int _currentPage;
   double _scale = 1.0;
 
-  /// 时间刻度单位（分钟/格）：默认 60；放大→更小(最小5)，缩小→更大(最大480)。
-  int get _unitMinutes => (60 / _scale).round().clamp(5, 8 * 60);
+  /// 时间刻度单位（分钟/格）：基准为设置的"时间精度"，双指缩放时按比例变化，
+  /// 放大→更小(最小5)，缩小→更大(最大480=8小时)。
+  int get _unitMinutes =>
+      (widget.provider.generalTimelineUnitMinutes / _scale)
+          .round()
+          .clamp(5, 8 * 60);
 
   @override
   void initState() {
@@ -135,9 +139,10 @@ class _WeekCalendarViewState extends State<_WeekCalendarView> {
       onScaleStart: (_) {},
       onScaleUpdate: (details) {
         if (details.pointerCount < 2) return;
+        final base = widget.provider.generalTimelineUnitMinutes;
         final next = (_scale * details.scale).clamp(
-          60 / 480,
-          60 / 5,
+          base / 480,
+          base / 5,
         );
         if ((next - _scale).abs() > 0.01) {
           setState(() => _scale = next);

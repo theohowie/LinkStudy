@@ -21,6 +21,8 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
   int get generalLunchStartMinute => _appData.generalMode.lunchStartMinute;
   int get generalLunchEndMinute => _appData.generalMode.lunchEndMinute;
   int get generalTimeGridMinutes => _appData.generalMode.timeGridMinutes;
+  int get generalTimelineUnitMinutes =>
+      _appData.generalMode.timelineUnitMinutes;
   bool get closeGeneralEventPopupOnOutsideTap =>
       _appData.generalMode.closeEventPopupOnOutsideTap;
 
@@ -108,6 +110,7 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
     int? lunchStartMinute,
     int? lunchEndMinute,
     int? timeGridMinutes,
+    int? timelineUnitMinutes,
     bool? closeEventPopupOnOutsideTap,
   }) async {
     _appData = _appData.copyWith(
@@ -121,6 +124,7 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
         lunchStartMinute: lunchStartMinute,
         lunchEndMinute: lunchEndMinute,
         timeGridMinutes: timeGridMinutes,
+        timelineUnitMinutes: timelineUnitMinutes,
         closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
       ),
     );

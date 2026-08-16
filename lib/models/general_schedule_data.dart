@@ -146,6 +146,7 @@ class GeneralScheduleData {
     this.lunchStartMinute = 12 * 60,
     this.lunchEndMinute = 13 * 60,
     this.timeGridMinutes = 60,
+    this.timelineUnitMinutes = 60,
     this.closeEventPopupOnOutsideTap = true,
     this.themeMode = defaultThemeMode,
     this.themeColorMode = defaultThemeColorMode,
@@ -165,6 +166,10 @@ class GeneralScheduleData {
   final int lunchStartMinute;
   final int lunchEndMinute;
   final int timeGridMinutes;
+
+  /// 时间线时间精度（分钟/刻度）：5-480 无级调节，默认 60（1 小时）。
+  final int timelineUnitMinutes;
+
   final bool closeEventPopupOnOutsideTap;
   final String themeMode;
   final String themeColorMode;
@@ -210,6 +215,7 @@ class GeneralScheduleData {
     'lunchStartMinute': lunchStartMinute,
     'lunchEndMinute': lunchEndMinute,
     'timeGridMinutes': timeGridMinutes,
+    'timelineUnitMinutes': timelineUnitMinutes,
     'closeEventPopupOnOutsideTap': closeEventPopupOnOutsideTap,
     'themeMode': normalizeThemeMode(themeMode),
     'themeColorMode': normalizeThemeColorMode(themeColorMode),
@@ -293,6 +299,9 @@ class GeneralScheduleData {
       timeGridMinutes: _normalizeGridMinutes(
         _intValue(json['timeGridMinutes']),
       ),
+      timelineUnitMinutes: _normalizeTimelineUnitMinutes(
+        _intValue(json['timelineUnitMinutes']),
+      ),
       closeEventPopupOnOutsideTap:
           _boolValue(json['closeEventPopupOnOutsideTap']) ?? true,
       themeMode: normalizeThemeMode(
@@ -334,6 +343,7 @@ class GeneralScheduleData {
     int? lunchStartMinute,
     int? lunchEndMinute,
     int? timeGridMinutes,
+    int? timelineUnitMinutes,
     bool? closeEventPopupOnOutsideTap,
     String? themeMode,
     String? themeColorMode,
@@ -355,6 +365,9 @@ class GeneralScheduleData {
       lunchStartMinute: lunchStartMinute ?? this.lunchStartMinute,
       lunchEndMinute: lunchEndMinute ?? this.lunchEndMinute,
       timeGridMinutes: timeGridMinutes ?? this.timeGridMinutes,
+      timelineUnitMinutes: _normalizeTimelineUnitMinutes(
+        timelineUnitMinutes ?? this.timelineUnitMinutes,
+      ),
       closeEventPopupOnOutsideTap:
           closeEventPopupOnOutsideTap ?? this.closeEventPopupOnOutsideTap,
       themeMode: normalizeThemeMode(themeMode ?? this.themeMode),
@@ -464,6 +477,7 @@ class GeneralScheduleData {
       lunchStartMinute: lunchStart,
       lunchEndMinute: lunchEnd,
       timeGridMinutes: _normalizeGridMinutes(timeGridMinutes),
+      timelineUnitMinutes: _normalizeTimelineUnitMinutes(timelineUnitMinutes),
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
       themeMode: normalizeThemeMode(themeMode),
       themeColorMode: normalizeThemeColorMode(themeColorMode),
@@ -507,6 +521,12 @@ int _normalizeGridMinutes(int? value) {
     default:
       return 60;
   }
+}
+
+/// 时间线时间精度归一化：5-480 分钟（5 分钟 ~ 8 小时），默认 60。
+int _normalizeTimelineUnitMinutes(int? value) {
+  if (value == null) return 60;
+  return value.clamp(5, 480).toInt();
 }
 
 /// 读取日时间边界（分钟级）：优先新键（分钟），兼容旧键（小时 × 60）。
