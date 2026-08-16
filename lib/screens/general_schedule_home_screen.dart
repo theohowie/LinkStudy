@@ -105,10 +105,8 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: l10n.addEvent,
-            onPressed: _editorSheetOpen
-                ? null
-                : () => _openEditor(context, provider),
+            tooltip: l10n.addCourse,
+            onPressed: _pendingSheetOpen ? null : () => _openAddCourse(context),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -523,6 +521,17 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   }
 
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。
+  /// 首页右上角 + ：打开"添加课程"半弹窗（填 URL/名称/时长，与悬浮窗同一入库入口）。
+  Future<void> _openAddCourse(BuildContext context) async {
+    if (_pendingSheetOpen) return;
+    _setUiBusyFlag(() => _pendingSheetOpen = true);
+    try {
+      await showAddCourseSheet(context, store: LinkCourseStore.instance);
+    } finally {
+      _setUiBusyFlag(() => _pendingSheetOpen = false);
+    }
+  }
+
   /// AI 排课进行中时改为打开进度面板（查看思考过程与结果）。
   Future<void> _openPendingCourses(
     BuildContext context,
