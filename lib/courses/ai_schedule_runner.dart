@@ -246,10 +246,13 @@ class AiScheduleRunner extends ChangeNotifier {
     }
   }
 
-  /// 仅测试用：清空任务状态。
-  @visibleForTesting
-  void debugReset() {
+  /// 清空当前任务状态（重新排课前调用，让排课流程从头开始）。
+  void reset() {
     _task = null;
     notifyListeners();
   }
+
+  /// 仅测试用：清空任务状态。
+  @visibleForTesting
+  void debugReset() => reset();
 }

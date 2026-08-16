@@ -19,7 +19,9 @@ class LinkStudyGridSync {
   final LinkCourseStore store;
 
   static const scheduleName = 'LinkStudy 课表';
-  static const _eventIdPrefix = 'ls_';
+
+  /// 课程网格事件 id 前缀（公开，供首页识别可拖拽课程事件）。
+  static const eventIdPrefix = 'ls_';
 
   /// 把当前槽位同步到通用日程网格（幂等：事件 id 稳定，重复调用覆盖）。
   Future<void> sync() async {
@@ -52,7 +54,7 @@ class LinkStudyGridSync {
     // 2. 重建事件：保留用户自己的事件 + 替换 LinkStudy 事件。
     final today = DateTime.now();
     final keptEvents = schedule.events
-        .where((e) => !e.id.startsWith(_eventIdPrefix))
+        .where((e) => !e.id.startsWith(eventIdPrefix))
         .toList();
     final linkEvents = <GeneralEvent>[
       for (final slot in store.slots)
@@ -102,7 +104,7 @@ GeneralEvent buildGridEvent(
     slot.endMinute % 60,
   );
   return GeneralEvent(
-    id: '${LinkStudyGridSync._eventIdPrefix}${course.id}',
+    id: '${LinkStudyGridSync.eventIdPrefix}${course.id}',
     calendarId: calendarId,
     title: course.title,
     startDateTimeIso: start.toIso8601String(),

@@ -299,5 +299,67 @@ void main() {
       expect(store.courses, isEmpty);
       expect(store.slots, isEmpty);
     });
+
+    test('moveSlot 调整课程时间并保留颜色', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final course = await store.addCourse(
+        url: 'https://example.com/move',
+        title: '可拖动课程',
+        durationMinutes: 40,
+      );
+      await store.scheduleWithOrder(
+        courseIds: [course.id],
+        ordered: [(courseId: course.id, restAfterMinutes: 0)],
+        days: 7,
+        availabilityByWeekday: availability,
+      );
+      final before = store.slots.single;
+      expect(before.startMinute, isNot(10 * 60));
+
+      await store.moveSlot(
+        course.id,
+        epochDay: before.epochDay ?? 0,
+        weekday: before.weekday,
+        startMinute: 10 * 60,
+        endMinute: 10 * 60 + 40,
+      );
+      final after = store.slots.single;
+      expect(after.startMinute, 10 * 60);
+      expect(after.endMinute, 10 * 60 + 40);
+      expect(after.colorValue, before.colorValue);
+    });
+
+    test('clearSlotsForCourses 一键清空课程槽位(回未排课池)', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final a = await store.addCourse(
+        url: 'https://example.com/clear-a',
+        title: '课程A',
+        durationMinutes: 40,
+      );
+      final b = await store.addCourse(
+        url: 'https://example.com/clear-b',
+        title: '课程B',
+        durationMinutes: 40,
+      );
+      await store.scheduleWithOrder(
+        courseIds: [a.id, b.id],
+        ordered: [
+          (courseId: a.id, restAfterMinutes: 0),
+          (courseId: b.id, restAfterMinutes: 0),
+        ],
+        days: 7,
+        availabilityByWeekday: availability,
+      );
+      expect(store.slots, hasLength(2));
+      expect(store.pendingCount, 0);
+
+      // 只清空 a 的槽位 → a 回池,b 保留。
+      await store.clearSlotsForCourses([a.id]);
+      expect(store.slots, hasLength(1));
+      expect(store.slots.single.courseId, b.id);
+      expect(store.pendingCount, 1);
+    });
   });
 }

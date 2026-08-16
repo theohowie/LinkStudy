@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lunar/lunar.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../courses/ai_schedule_runner.dart';
 import '../courses/link_course.dart';
+import '../courses/link_study_grid_sync.dart';
 import '../providers/timetable_provider.dart';
 import '../utils/general_schedule_colors.dart';
 import '../widgets/app_modal_sheet.dart';
@@ -248,6 +250,19 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
                               context,
                               provider,
                               occurrences,
+                            ),
+                        onMoveCourse:
+                            (
+                              occurrence,
+                              targetDay,
+                              startMinute,
+                              deltaMinutes,
+                            ) => _moveLinkCourseSlot(
+                              context,
+                              occurrence,
+                              targetDay,
+                              startMinute,
+                              deltaMinutes,
                             ),
                       ),
                     },
@@ -520,6 +535,36 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     );
   }
 
+  /// 长按拖拽课程日程到新时间/新日期：更新 LinkStudy 槽位，
+  /// 网格同步监听 store 变化自动重建事件。
+  void _moveLinkCourseSlot(
+    BuildContext context,
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  ) {
+    final eventId = occurrence.event.id;
+    if (!eventId.startsWith(LinkStudyGridSync.eventIdPrefix)) return;
+    final courseId = eventId.substring(LinkStudyGridSync.eventIdPrefix.length);
+    final store = LinkCourseStore.instance;
+    final slot = store.slots.where((s) => s.courseId == courseId).firstOrNull;
+    if (slot == null) return;
+    final duration = slot.endMinute - slot.startMinute;
+    final endMinute = (startMinute + duration).clamp(0, 24 * 60);
+    if (endMinute <= startMinute) return;
+    final day = DateTime(targetDay.year, targetDay.month, targetDay.day);
+    unawaited(
+      store.moveSlot(
+        courseId,
+        epochDay: epochDayOf(day),
+        weekday: day.weekday,
+        startMinute: startMinute,
+        endMinute: endMinute,
+      ),
+    );
+  }
+
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。
   /// 首页右上角 + ：打开"添加课程"半弹窗（填 URL/名称/时长，与悬浮窗同一入库入口）。
   Future<void> _openAddCourse(BuildContext context) async {
@@ -544,11 +589,24 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     try {
       final runner = AiScheduleRunner.instance;
       if (runner.isRunning || runner.hasUnviewedResult) {
+        final task = runner.task;
         await showAppModalSheet<void>(
           context: context,
           maxWidth: appSheetWidthMedium,
-          builder: (sheetContext) =>
-              AiScheduleProgressSheet(store: LinkCourseStore.instance),
+          builder: (sheetContext) => AiScheduleProgressSheet(
+            store: LinkCourseStore.instance,
+            onRerun: (task) async {
+              // 一键重排：清空本次课程槽位（课程回未排课池）→ 关闭面板 → 重新打开设置弹窗。
+              if (!sheetContext.mounted) return;
+              Navigator.of(sheetContext).pop();
+              await LinkCourseStore.instance.clearSlotsForCourses(
+                task.courseIds,
+              );
+              runner.reset();
+              if (!mounted || !context.mounted) return;
+              await _openPendingCourses(context, provider);
+            },
+          ),
         );
         runner.markViewed();
         return;

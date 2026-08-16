@@ -388,6 +388,111 @@ class _OccurrenceCard extends StatelessWidget {
   }
 }
 
+/// 可长按拖拽的课程卡片：仅 LinkStudy 课程事件启用。
+/// 长按后上下拖动调整开始时间（吸附到网格粒度）、左右拖动跨天；
+/// 拖动中卡片实时跟随，松手后把目标日期/时间通过 [onMoveCourse] 抛出。
+class _DraggableOccurrenceCard extends StatefulWidget {
+  const _DraggableOccurrenceCard({
+    required this.occurrence,
+    required this.dense,
+    required this.narrow,
+    required this.overlapping,
+    required this.onTap,
+    required this.draggable,
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.minuteHeight,
+    required this.dayIndex,
+    required this.onMoveCourse,
+  });
+
+  final GeneralEventOccurrence occurrence;
+  final bool dense;
+  final bool narrow;
+  final bool overlapping;
+  final VoidCallback onTap;
+  final bool draggable;
+  final int startMinutes;
+  final int endMinutes;
+  final double minuteHeight;
+  final int dayIndex;
+
+  /// 参数：目标日下标 / 目标开始分钟 / 相对原始开始分钟的偏移。
+  final void Function(int dayIndex, int startMinute, int deltaMinutes)
+  onMoveCourse;
+
+  @override
+  State<_DraggableOccurrenceCard> createState() =>
+      _DraggableOccurrenceCardState();
+}
+
+class _DraggableOccurrenceCardState extends State<_DraggableOccurrenceCard> {
+  Offset _dragOffset = Offset.zero;
+  bool _dragging = false;
+  int _originalStartMinute = 0;
+  int _originalDayIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = _OccurrenceCard(
+      occurrence: widget.occurrence,
+      dense: widget.dense,
+      narrow: widget.narrow,
+      overlapping: widget.overlapping,
+      onTap: widget.onTap,
+    );
+    if (!widget.draggable) return card;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onLongPressStart: (details) {
+        _originalStartMinute = widget.occurrence.start.hour * 60 +
+            widget.occurrence.start.minute;
+        _originalDayIndex = widget.dayIndex;
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _dragging = true;
+          _dragOffset = Offset.zero;
+        });
+      },
+      onLongPressMoveUpdate: (details) {
+        if (!_dragging) return;
+        setState(() {
+          _dragOffset = details.offsetFromOrigin;
+        });
+      },
+      onLongPressEnd: (details) {
+        if (!_dragging) return;
+        final rawMinutes = (_dragOffset.dy / widget.minuteHeight).round();
+        // 吸附到网格粒度。
+        final snapped = (rawMinutes ~/ 10) * 10;
+        final deltaMinutes = snapped;
+        final newStart = (_originalStartMinute + deltaMinutes)
+            .clamp(widget.startMinutes, widget.endMinutes - 15);
+        // 跨天：每超过一个 dayWidth 算一天。
+        final dayShift = (_dragOffset.dx / 80).round();
+        final newDayIndex = _originalDayIndex + dayShift;
+        setState(() {
+          _dragging = false;
+          _dragOffset = Offset.zero;
+        });
+        widget.onMoveCourse(newDayIndex, newStart, deltaMinutes);
+      },
+      onLongPressCancel: () {
+        if (!_dragging) return;
+        setState(() {
+          _dragging = false;
+          _dragOffset = Offset.zero;
+        });
+      },
+      child: Transform.translate(
+        offset: _dragOffset,
+        child: card,
+      ),
+    );
+  }
+}
+
 class _MoreOccurrencesCard extends StatelessWidget {
   const _MoreOccurrencesCard({
     required this.occurrence,

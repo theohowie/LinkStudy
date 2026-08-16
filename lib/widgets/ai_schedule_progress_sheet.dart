@@ -278,9 +278,12 @@ class AiScheduleConversation extends StatelessWidget {
 
 /// 排课进度面板：展示后台 AI 排课的对话过程与结果。
 class AiScheduleProgressSheet extends StatelessWidget {
-  const AiScheduleProgressSheet({super.key, required this.store});
+  const AiScheduleProgressSheet({super.key, required this.store, this.onRerun});
 
   final LinkCourseStore store;
+
+  /// 完成/失败后"重新排课"回调（由调用方清空槽位并重新打开排课设置弹窗）。
+  final Future<void> Function(AiScheduleTask task)? onRerun;
 
   @override
   Widget build(BuildContext context) {
@@ -302,6 +305,7 @@ class AiScheduleProgressSheet extends StatelessWidget {
         }
         final done = task.phase == AiSchedulePhase.done;
         final failed = task.phase == AiSchedulePhase.failed;
+        final rerun = onRerun;
         return AppSheetScaffold(
           heightFactor: 0.84,
           title: const Text('AI 排课'),
@@ -311,6 +315,11 @@ class AiScheduleProgressSheet extends StatelessWidget {
                 : '后台进行中，可关闭本面板',
           ),
           actions: [
+            if (done && rerun != null)
+              TextButton(
+                onPressed: () => rerun(task),
+                child: const Text('重新排课'),
+              ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('关闭'),

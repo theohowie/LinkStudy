@@ -40,6 +40,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   ScheduleStartMode _startMode = ScheduleStartMode.now;
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   bool _scheduling = false;
+  String _rerunNote = '';
   final TextEditingController _notes = TextEditingController();
 
   @override
@@ -210,7 +211,10 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       notes: _notes.text.trim(),
       startMode: _startMode,
       startDate: _startMode == ScheduleStartMode.onDate ? _startDate : null,
+      rerunNote: _rerunNote,
     );
+    // 重排提示一次性使用：本次排完即清空。
+    _rerunNote = '';
     final availability = _effectiveAvailability();
     final occupiedEvents = _occupiedEventsText();
     // 后台静默排课：弹窗切换为"排课中"状态（不关闭），可查看进度或主动退出，后台继续执行。
@@ -234,7 +238,21 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
     await showAppModalSheet<void>(
       context: context,
       maxWidth: appSheetWidthMedium,
-      builder: (sheetContext) => AiScheduleProgressSheet(store: widget.store),
+      builder: (sheetContext) => AiScheduleProgressSheet(
+        store: widget.store,
+        onRerun: (task) async {
+          // 一键重排：清空本次课程槽位 → 关闭进度面板 → 回到设置表单重新排课。
+          if (!sheetContext.mounted) return;
+          Navigator.of(sheetContext).pop();
+          await widget.store.clearSlotsForCourses(task.courseIds);
+          AiScheduleRunner.instance.reset();
+          if (!mounted) return;
+          setState(() {
+            _scheduling = false;
+            _rerunNote = '上一版排课不满意,请重新排一份不同的方案';
+          });
+        },
+      ),
     );
   }
 

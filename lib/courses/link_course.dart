@@ -528,6 +528,52 @@ class LinkCourseStore extends ChangeNotifier {
     await _persist();
   }
 
+  /// 清空指定课程的槽位（一键重排用：课程回到未排课池，重新 AI 排课）。
+  Future<void> clearSlotsForCourses(Iterable<String> courseIds) async {
+    final ids = courseIds.toSet();
+    final next = _slots.where((s) => !ids.contains(s.courseId)).toList();
+    if (next.length == _slots.length) return;
+    _slots = next;
+    notifyListeners();
+    await _persist();
+  }
+
+  /// 手动调整课程槽位的时间（网格长按拖拽联动）：
+  /// 替换该课程所有槽位为新的起止时间与日期（可换天），并持久化。
+  /// [epochDay]/[weekday] 为新日期（weekday 1=周一…7=周日）。
+  Future<void> moveSlot(
+    String courseId, {
+    required int epochDay,
+    required int weekday,
+    required int startMinute,
+    required int endMinute,
+  }) async {
+    if (endMinute <= startMinute) return;
+    final next = <ScheduleSlot>[];
+    var replaced = false;
+    for (final s in _slots) {
+      if (s.courseId == courseId) {
+        next.add(
+          ScheduleSlot(
+            courseId: s.courseId,
+            epochDay: epochDay,
+            weekday: weekday,
+            startMinute: startMinute,
+            endMinute: endMinute,
+            colorValue: s.colorValue,
+          ),
+        );
+        replaced = true;
+      } else {
+        next.add(s);
+      }
+    }
+    if (!replaced) return;
+    _slots = next;
+    notifyListeners();
+    await _persist();
+  }
+
   LinkCourse? courseById(String id) =>
       _courses.where((c) => c.id == id).firstOrNull;
 

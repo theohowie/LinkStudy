@@ -105,6 +105,7 @@ class AiSchedulePrefs {
     this.timePreference = '',
     this.startMode = ScheduleStartMode.now,
     this.startDate,
+    this.rerunNote = '',
   });
 
   final StudyIntensity intensity;
@@ -113,6 +114,10 @@ class AiSchedulePrefs {
   final String timePreference; // 倾向的学习时间段；空 = 全天
   final ScheduleStartMode startMode; // 从现在开始 / 从指定日期开始
   final DateTime? startDate; // startMode == onDate 时的起始日期（仅日期部分）
+
+  /// 重排提示：用户对上一版排课不满意时填写（如"第一版挤在上午"），
+  /// 随提示词告知 AI 重新排。不持久化。
+  final String rerunNote;
 
   Map<String, dynamic> toJson() => {
     'intensity': intensity.name,
@@ -738,7 +743,14 @@ class AiScheduler {
     final occupiedSection = occupiedEvents.trim().isEmpty
         ? ''
         : '\n\n## 用户已有日程(不可排课,必须避开)\n$occupiedEvents';
-    return filled.replaceAll('{{occupied_events_section}}', occupiedSection);
+    // 追加重排提示：用户对上一版不满意时告知 AI。
+    final rerunSection = prefs.rerunNote.trim().isEmpty
+        ? ''
+        : '\n\n## 重排要求(重要)\n用户对上一版排课不满意:${prefs.rerunNote.trim()}。'
+              '请重新规划一份不同的排课方案,重点修正上述问题。';
+    return filled
+        .replaceAll('{{occupied_events_section}}', occupiedSection)
+        .replaceAll('{{rerun_section}}', rerunSection);
   }
 
   /// 从时间窗描述提取相邻时段之间的休息段；无法解析时返回"无"。

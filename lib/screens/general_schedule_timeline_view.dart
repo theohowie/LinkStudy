@@ -20,6 +20,7 @@ class _WeekCalendarView extends StatefulWidget {
     required this.onEmptySlotTap,
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
+    this.onMoveCourse,
   });
 
   final DateTime date;
@@ -29,6 +30,12 @@ class _WeekCalendarView extends StatefulWidget {
   final ValueChanged<DateTime> onEmptySlotTap;
   final ValueChanged<GeneralEventOccurrence> onOccurrenceTap;
   final ValueChanged<List<GeneralEventOccurrence>> onMoreOccurrencesTap;
+  final void Function(
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  )? onMoveCourse;
 
   @override
   State<_WeekCalendarView> createState() => _WeekCalendarViewState();
@@ -133,6 +140,7 @@ class _WeekCalendarViewState extends State<_WeekCalendarView> {
           onEmptySlotTap: widget.onEmptySlotTap,
           onOccurrenceTap: widget.onOccurrenceTap,
           onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
+          onMoveCourse: widget.onMoveCourse,
         );
       },
     );
@@ -148,6 +156,7 @@ class _WeekTimelinePage extends StatelessWidget {
     required this.onEmptySlotTap,
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
+    this.onMoveCourse,
   });
 
   final DateTime weekStart;
@@ -157,6 +166,12 @@ class _WeekTimelinePage extends StatelessWidget {
   final ValueChanged<DateTime> onEmptySlotTap;
   final ValueChanged<GeneralEventOccurrence> onOccurrenceTap;
   final ValueChanged<List<GeneralEventOccurrence>> onMoreOccurrencesTap;
+  final void Function(
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  )? onMoveCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +193,7 @@ class _WeekTimelinePage extends StatelessWidget {
       onEmptySlotTap: onEmptySlotTap,
       onOccurrenceTap: onOccurrenceTap,
       onMoreOccurrencesTap: onMoreOccurrencesTap,
+      onMoveCourse: onMoveCourse,
     );
   }
 }
@@ -744,6 +760,7 @@ class _CalendarTimeline extends StatelessWidget {
     required this.onEmptySlotTap,
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
+    this.onMoveCourse,
   });
 
   static const double _headerHeight = 56;
@@ -761,6 +778,15 @@ class _CalendarTimeline extends StatelessWidget {
   final ValueChanged<DateTime> onEmptySlotTap;
   final ValueChanged<GeneralEventOccurrence> onOccurrenceTap;
   final ValueChanged<List<GeneralEventOccurrence>> onMoreOccurrencesTap;
+
+  /// 长按拖拽课程事件到新日期/新时间。
+  /// 参数：occurrence / 目标日期 / 目标开始分钟 / 相对原起点的分钟偏移。
+  final void Function(
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  )? onMoveCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -907,6 +933,7 @@ class _CalendarTimeline extends StatelessWidget {
                             endMinutes: endMinutes,
                             minuteHeight: minuteHeight,
                             topOffset: _timeLabelVerticalPadding,
+                            dayIndex: index,
                           ),
                         for (var index = 0; index < days.length; index++)
                           if (_sameDay(days[index], DateTime.now()) &&
@@ -950,6 +977,7 @@ class _CalendarTimeline extends StatelessWidget {
     required int endMinutes,
     required double minuteHeight,
     required double topOffset,
+    int dayIndex = 0,
   }) sync* {
     final dayStart = normalizeDateOnly(day);
     final dayEnd = dayStart.add(const Duration(days: 1));
@@ -999,6 +1027,9 @@ class _CalendarTimeline extends StatelessWidget {
         (availableWidth - laneGap * (layout.laneCount - 1)) / layout.laneCount,
       );
       final laneLeftOffset = layout.lane * (laneWidth + laneGap);
+      final occurrence = layout.occurrence;
+      final isLinkCourse =
+          occurrence.event.id.startsWith(LinkStudyGridSync.eventIdPrefix);
       yield Positioned(
         left: left + horizontalInset + laneLeftOffset,
         top:
@@ -1007,19 +1038,32 @@ class _CalendarTimeline extends StatelessWidget {
         height: cardHeight,
         child: layout.isMore
             ? _MoreOccurrencesCard(
-                occurrence: layout.occurrence,
+                occurrence: occurrence,
                 count: layout.moreCount,
                 dense: cardHeight < 56 || laneWidth < 44,
                 narrow: laneWidth < 44,
                 overlapping: layout.laneCount > 1,
                 onTap: () => onMoreOccurrencesTap(layout.moreOccurrences!),
               )
-            : _OccurrenceCard(
-                occurrence: layout.occurrence,
+            : _DraggableOccurrenceCard(
+                occurrence: occurrence,
                 dense: cardHeight < 56 || laneWidth < 44,
                 narrow: laneWidth < 44,
                 overlapping: layout.laneCount > 1,
-                onTap: () => onOccurrenceTap(layout.occurrence),
+                onTap: () => onOccurrenceTap(occurrence),
+                // 仅 LinkStudy 课程事件可长按拖动调整时间。
+                draggable: isLinkCourse,
+                startMinutes: startMinutes,
+                endMinutes: endMinutes,
+                minuteHeight: minuteHeight,
+                dayIndex: dayIndex,
+                onMoveCourse: (newDayIndex, newStartMinute, deltaMinutes) =>
+                    onMoveCourse?.call(
+                  occurrence,
+                  days[newDayIndex.clamp(0, days.length - 1)],
+                  newStartMinute,
+                  deltaMinutes,
+                ),
               ),
       );
     }
