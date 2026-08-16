@@ -24,23 +24,23 @@ class IngestResult {
   final LinkCourse? course;
 
   const IngestResult.success(LinkCourse this.course)
-      : success = true,
-        error = null;
+    : success = true,
+      error = null;
 
   const IngestResult.failure(String this.error)
-      : success = false,
-        course = null;
+    : success = false,
+      course = null;
 }
 
 /// 课程入库接口：接收悬浮窗采集的课程草稿，解析校验后写入本地课程表存储。
 ///
 /// 这是悬浮窗（采集端）与课程表存储之间的唯一入口：
-/// - 解析：从 URL/文本提取合法链接，缺失标题时自动补全；
-/// - 校验：URL 合法、标题非空、时长 1-600；
+/// - 解析：从 URL/文本提取合法链接（URL 选填），缺失标题时自动补全；
+/// - 校验：课程名称、时长（1-600）必填；URL 非空时须为合法 http(s) 链接；
 /// - 转发：调用 [LinkCourseStore.addCourse] 落库。
 class CourseIngestService {
   CourseIngestService({LinkCourseStore? store})
-      : _store = store ?? LinkCourseStore.instance;
+    : _store = store ?? LinkCourseStore.instance;
 
   final LinkCourseStore _store;
 
@@ -48,17 +48,17 @@ class CourseIngestService {
 
   /// 解析并入库一条课程草稿。
   Future<IngestResult> ingest(CourseDraft draft) async {
-    // 1. URL 解析：必须含合法 http(s) 链接。
+    // 1. URL 解析：选填。非空时必须含合法 http(s) 链接。
     final urls = extractUrls(draft.url);
     final url = urls.isNotEmpty ? urls.first : draft.url.trim();
-    if (!_isHttpUrl(url)) {
+    if (url.isNotEmpty && !_isHttpUrl(url)) {
       return IngestResult.failure('链接无效：请输入合法的 http(s) 链接');
     }
 
-    // 2. 标题解析：为空时从 URL 自动提取提示。
+    // 2. 标题解析：必填。为空时从 URL 自动提取提示（URL 也为空则失败）。
     var title = draft.title.trim();
     if (title.isEmpty) {
-      title = titleHintFromUrl(url);
+      title = url.isEmpty ? '' : titleHintFromUrl(url);
     }
     if (title.isEmpty) {
       return IngestResult.failure('课程名称不能为空');
@@ -95,8 +95,9 @@ class CourseIngestService {
   String titleHintFromUrl(String url) {
     try {
       final uri = Uri.parse(url.trim());
-      final segments =
-          uri.pathSegments.where((s) => s.isNotEmpty && s.length > 3);
+      final segments = uri.pathSegments.where(
+        (s) => s.isNotEmpty && s.length > 3,
+      );
       final last = segments.isEmpty ? null : segments.last;
       return last ?? uri.host;
     } catch (_) {

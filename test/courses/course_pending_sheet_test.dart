@@ -6,9 +6,7 @@ import 'package:linkstudy/widgets/course_pending_sheet.dart';
 Future<void> _pumpSheet(WidgetTester tester, LinkCourseStore store) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: Scaffold(
-        body: CoursePendingSheet(store: store),
-      ),
+      home: Scaffold(body: CoursePendingSheet(store: store)),
     ),
   );
   await tester.pump();
@@ -164,7 +162,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('添加课程'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).at(0), 'https://example.com/manual');
+    await tester.enterText(
+      find.byType(TextField).at(0),
+      'https://example.com/manual',
+    );
     await tester.enterText(find.byType(TextField).at(1), '手动课程');
     await tester.enterText(find.byType(TextField).at(2), '30');
     await tester.tap(find.widgetWithText(FilledButton, '保存'));
@@ -174,6 +175,42 @@ void main() {
     expect(store.pendingCount, 1);
     expect(find.text('手动课程'), findsOneWidget);
     expect(find.text('30 分钟'), findsOneWidget);
+  });
+
+  testWidgets('手动添加课程：URL 选填，名称+时长必填', (tester) async {
+    final store = LinkCourseStore.instance;
+    store.debugClear();
+    await _pumpSheet(tester, store);
+
+    await tester.tap(find.text('添加'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加课程'), findsOneWidget);
+
+    // 只填名称+时长（URL 留空）可保存。
+    await tester.enterText(find.byType(TextField).at(0), '');
+    await tester.enterText(find.byType(TextField).at(1), '无链接课程');
+    await tester.enterText(find.byType(TextField).at(2), '30');
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pumpAndSettle();
+
+    expect(store.courses, hasLength(1));
+    expect(store.courses.single.title, '无链接课程');
+    expect(store.courses.single.url, isEmpty);
+    expect(find.text('无链接课程'), findsOneWidget);
+
+    // 名称必填：留空时提示。
+    await tester.tap(find.text('添加'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField).at(0),
+      'https://example.com/no-title',
+    );
+    await tester.enterText(find.byType(TextField).at(1), '');
+    await tester.enterText(find.byType(TextField).at(2), '30');
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pump();
+    expect(find.text('请填写课程名称'), findsOneWidget);
+    expect(store.courses, hasLength(1), reason: '名称为空不应入库');
   });
 
   testWidgets('无课程时全选与下一步禁用', (tester) async {

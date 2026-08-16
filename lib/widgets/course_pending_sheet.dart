@@ -102,8 +102,8 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                 setSheetState(() => errorText = '时长需为 1-600 的整数（分钟）');
                 return;
               }
-              if (urlController.text.trim().isEmpty) {
-                setSheetState(() => errorText = '请填写课程链接 URL');
+              if (titleController.text.trim().isEmpty) {
+                setSheetState(() => errorText = '请填写课程名称');
                 return;
               }
               Navigator.of(sheetContext).pop(true);
@@ -126,8 +126,8 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                     controller: urlController,
                     keyboardType: TextInputType.url,
                     decoration: const InputDecoration(
-                      labelText: '链接 URL（必填）',
-                      hintText: 'https://…',
+                      labelText: '链接 URL（选填）',
+                      hintText: 'https://…（可选）',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -136,8 +136,8 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                   TextField(
                     controller: titleController,
                     decoration: const InputDecoration(
-                      labelText: '课程名称',
-                      hintText: '留空则从链接自动提取',
+                      labelText: '课程名称（必填）',
+                      hintText: '例如：数据结构与算法',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -147,7 +147,7 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                     controller: durationController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: '时长（分钟，1-600）',
+                      labelText: '时长（分钟，必填，1-600）',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -247,7 +247,8 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
       builder: (context, child) {
         final pending = _pending;
         final allSelected =
-            pending.isNotEmpty && pending.every((c) => _selected.contains(c.id));
+            pending.isNotEmpty &&
+            pending.every((c) => _selected.contains(c.id));
         return AppSheetScaffold(
           title: Text('未排课课程（${pending.length}）'),
           subtitle: const Text('勾选要安排学习的课程，可添加、全选或删除'),
@@ -264,14 +265,14 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
                 onPressed: pending.isEmpty
                     ? null
                     : () => setState(() {
-                          if (allSelected) {
-                            _selected.clear();
-                          } else {
-                            _selected
-                              ..clear()
-                              ..addAll(pending.map((c) => c.id));
-                          }
-                        }),
+                        if (allSelected) {
+                          _selected.clear();
+                        } else {
+                          _selected
+                            ..clear()
+                            ..addAll(pending.map((c) => c.id));
+                        }
+                      }),
                 icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
                 label: Text(allSelected ? '取消全选' : '全选'),
               ),
@@ -280,11 +281,15 @@ class _CoursePendingSheetState extends State<CoursePendingSheet> {
           actions: [
             IconButton(
               tooltip: '删除勾选课程',
-              onPressed: _selected.isEmpty || _deleting ? null : _deleteSelected,
+              onPressed: _selected.isEmpty || _deleting
+                  ? null
+                  : _deleteSelected,
               icon: const Icon(Icons.delete_outline),
             ),
             FilledButton(
-              onPressed: _selected.isEmpty ? null : () => Navigator.of(context).pop(_selected.toList()),
+              onPressed: _selected.isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(_selected.toList()),
               child: const Text('下一步'),
             ),
           ],

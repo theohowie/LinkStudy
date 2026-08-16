@@ -6,7 +6,7 @@ void main() {
   group('CourseIngestService.ingest', () {
     test('合法草稿成功入库', () async {
       final store = LinkCourseStore.instance;
-    store.debugClear();
+      store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
         const CourseDraft(
@@ -24,7 +24,7 @@ void main() {
 
     test('从混合文本中提取 URL 并入库', () async {
       final store = LinkCourseStore.instance;
-    store.debugClear();
+      store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
         const CourseDraft(
@@ -39,7 +39,7 @@ void main() {
 
     test('标题为空时从 URL 自动提取', () async {
       final store = LinkCourseStore.instance;
-    store.debugClear();
+      store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
         const CourseDraft(
@@ -54,14 +54,10 @@ void main() {
 
     test('非法链接被拒绝', () async {
       final store = LinkCourseStore.instance;
-    store.debugClear();
+      store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
-        const CourseDraft(
-          url: 'not-a-url',
-          title: 'x',
-          durationMinutes: 40,
-        ),
+        const CourseDraft(url: 'not-a-url', title: 'x', durationMinutes: 40),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('链接无效'));
@@ -70,7 +66,7 @@ void main() {
 
     test('时长越界被拒绝', () async {
       final store = LinkCourseStore.instance;
-    store.debugClear();
+      store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
         const CourseDraft(
@@ -83,16 +79,25 @@ void main() {
       expect(result.error, contains('时长'));
     });
 
+    test('URL 选填：标题+时长完整时无链接也能入库', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final service = CourseIngestService(store: store);
+      final result = await service.ingest(
+        const CourseDraft(url: '', title: '手打笔记课程', durationMinutes: 45),
+      );
+      expect(result.success, isTrue);
+      expect(result.course!.url, isEmpty);
+      expect(result.course!.title, '手打笔记课程');
+      expect(store.courses, hasLength(1));
+    });
+
     test('标题为空且无法提取时被拒绝', () async {
       final store = LinkCourseStore.instance;
       store.debugClear();
       final service = CourseIngestService(store: store);
       final result = await service.ingest(
-        const CourseDraft(
-          url: 'https://',
-          title: '',
-          durationMinutes: 40,
-        ),
+        const CourseDraft(url: 'https://', title: '', durationMinutes: 40),
       );
       expect(result.success, isFalse);
     });
