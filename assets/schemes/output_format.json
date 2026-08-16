@@ -12,10 +12,11 @@
           "difficulty": "int, 1-9, AI 评估的课程难度",
           "importance": "int, 1-9, AI 评估的课程重要程度",
           "priorityCoefficient": "number, 0-1, 算法一计算的优先系数 P_i",
-          "startDay": "int, 1=明天, 2=后天, 依此类推",
+          "startDay": "int, 1=排课起始日(明天), 2=后天, 依此类推;同一门课拆分多段时每段都要给出",
           "startTime": "string, 'HH:MM' 24 小时制, 如 '09:00'",
           "endTime": "string, 'HH:MM' 24 小时制, 如 '10:30'",
-          "restAfterMinutes": "int, 该课程之后的休息分钟数, 可为 0"
+          "restAfterMinutes": "int, 该课程之后的休息分钟数, 可为 0",
+          "color": "string, '#RRGGBB', 每门课必须给一个与其他课程不同的颜色"
         }
       ],
       "reason": "string, 一句话说明排课思路(排序依据、强度匹配、约束处理)"
@@ -26,8 +27,12 @@
     "order 数组必须包含全部输入课程,每门课恰好出现一次(courseId 唯一)",
     "order 按 priorityCoefficient 降序排列",
     "每门课的可排总时长必须等于或接近其课程时长(允许因时间片粒度产生的少量舍入)",
+    "startDay/startTime/endTime 是必填字段:必须为每门课给出具体的排课时间,不得省略或只给顺序",
     "所有 startTime/endTime 必须落在对应日期的可用时间片内,不得与任何不可用时间段(休息段、单次不可用时段)重叠",
+    "必须严格遵守用户要求设置中的每日可用时间窗、每日固定休息段与时间偏好(如'早上9点到晚上9点、中午12点到下午1点半不学习'):开始时间不得早于时间窗开始,休息段内不得排课",
+    "强度档位限制(如轻松档的单次时长上限、每日总时长上限)必须遵守:总时长超出单日上限时应分散到多天,而不是挤在同一天",
     "startTime 必须早于 endTime",
+    "每门课的 color 必须互不相同(相邻课程避免同色)",
     "difficulty、importance、priorityCoefficient 必须与算法一的计算结果一致"
   ]
 }

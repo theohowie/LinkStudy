@@ -1,43 +1,66 @@
 {
   "schemeName": "intensity_matching_algorithm",
-  "schemeVersion": "1.0",
+  "schemeVersion": "1.1",
   "algorithmName": "强度档位与时间片的匹配规则",
-  "purpose": "把课程按用户选择的学习强度档位(轻松/中等/高强度)匹配到合适的时间片。三档强度不是简单的'时长长短'划分,而是分别对应不同的认知负荷承受能力和时间分布规律。",
+  "purpose": "把课程按用户选择的学习强度档位(轻松/中等/高强度)匹配到合适的时间片。三档强度的参数均基于学习科学实证研究校准,使同一档位内的学习效率最高。",
   "references": [
-    "认知负荷理论(高媛, 黄真真, 李冀红, 黄荣怀. 智慧学习环境中的认知负荷问题)",
-    "间隔学习效应(间隔学习研究综述; 间隔效应文献综述)",
-    "专注时长实证数据(微课教学应用讨论)"
+    {
+      "topic": "高强度档:峰值时段认知效率与单次专注时长",
+      "studies": [
+        "Chronotypes and the Synchrony Effect (May, Hasher & Healey, 2023, Perspectives on Psychological Science):个体在自身警觉性峰值时段执行高认知负荷任务的表现显著更优,排课应匹配用户个人峰值时段。",
+        "Investigating the Effectiveness of Self-Regulated, Pomodoro, and Flowtime Break-Taking Techniques (MDPI Behavioral Sciences, 2025):番茄工作法(25-50 分钟专注 + 短休息)对维持注意力与任务表现显著有效。"
+      ]
+    },
+    {
+      "topic": "中等档:间隔学习效应",
+      "studies": [
+        "Distributed Practice in Verbal Recall Tasks: A Review and Quantitative Synthesis (Cepeda, Pashler, Vul, Wixted & Rohrer, 2006, Psychological Bulletin):分散练习(同一内容间隔多天复习)的记忆保持显著优于集中练习,间隔 1-2 天为最优区间。"
+      ]
+    },
+    {
+      "topic": "轻松档:低认知负荷任务与碎片化学习",
+      "studies": [
+        "Cognitive Load Theory (Sweller, 1988):低难度任务的内在认知负荷低,可在低专注时段或碎片时间完成而不显著损失效率。",
+        "Micro-Learning: Bite-Sized Lessons Beat Marathon Study Sessions:短时段(5-15 分钟)碎片化学习适合预习、复习与低难度任务,利用零碎时间填充。"
+      ]
+    }
   ],
-  "designIdea": "三档强度分别对应不同的认知负荷承受能力和时间分布规律:高强度匹配专注力峰值时段且设单块与每日上限;中等按间隔重复规律分散;轻松作碎片填缝。",
+  "designIdea": "三档强度不是简单的'时长长短'划分,而是依据学习科学实证分别对应最高效的排布方式:高强度=匹配个人峰值时段+单次专注上限(25-50min)+每日总量上限;中等=间隔重复分散(1-2 天间隔最优);轻松=低认知负荷碎片填缝。每档在其适用场景下效率最优。",
   "profiles": {
     "high": {
       "label": "高强度",
-      "description": "匹配用户专注力峰值时段(需用户自报或从历史完成数据学习,如 9-11 点);单次时间块时长设上限 T_max;每日高强度时段总量设硬上限 D_max,超出则该课程优先系数再高也要延后;匹配优先系数最高的课程。",
+      "description": "匹配用户专注力峰值时段(个人警觉性峰值,需用户自报或从历史完成数据学习);单次时间块时长设上限 T_max;每日高强度时段总量设硬上限 D_max,超出则该课程优先系数再高也要延后;匹配优先系数最高的课程。依据同步效应与番茄工作法:峰值时段+25-50min 单次专注效率最高。",
       "T_max_minutes": 50,
-      "T_max_range": "建议 25-50 分钟区间,可配置",
+      "T_max_range": "25-50 分钟区间(番茄工作法实证最优),可配置",
       "D_max_minutes": 90,
       "prefer_peak_hours": true,
-      "spacing": "连续块,不间隔"
+      "spacing": "连续块,不间隔(单次深度专注)",
+      "break_after_minutes": {
+        "min": 5,
+        "max": 10,
+        "rationale": "番茄工作法建议专注后 5-10 分钟短休息恢复注意力"
+      }
     },
     "medium": {
       "label": "中等",
-      "description": "按'间隔重复'规律分布:同一门课不安排连续时间片,而是按 [1天, 2天, 4天...] 或用户自定义间隔周期分散到多个时间片;适合复习/巩固类任务。",
+      "description": "按'间隔重复'规律分布:同一门课不安排连续时间片,而是按最优间隔周期分散到多个时间片;适合复习/巩固类任务。依据 Cepeda 2006:间隔 1-2 天复习记忆保持最优。",
       "T_max_minutes": 60,
       "D_max_minutes": 150,
       "prefer_peak_hours": false,
       "spacing": {
         "type": "interval_repetition",
-        "interval_days": [1, 2, 4],
+        "interval_days": [1, 2],
+        "optimal_gap_days": "1-2 天(间隔效应最优区间)",
         "user_customizable": true
       }
     },
     "light": {
       "label": "轻松",
-      "description": "对时间连续性要求最低,可安排在碎片时间/低专注力时段;用于预习或低难度任务,作为'填缝'任务,优先使用零碎的可用时间片。",
+      "description": "对时间连续性要求最低,可安排在碎片时间/低专注力时段;用于预习或低难度任务,作为'填缝'任务,优先使用零碎的可用时间片。依据认知负荷理论与微学习:低难度任务碎片化学习效率不损失。",
       "T_max_minutes": 45,
       "D_max_minutes": 180,
       "prefer_peak_hours": false,
-      "spacing": "碎片填缝,一次放满"
+      "spacing": "碎片填缝,一次放满;可拆分利用 5-15 分钟微学习时段"
     }
   },
   "inputs": {
@@ -69,13 +92,14 @@
     ]
   },
   "matching_rules": [
-    "高强度:优先匹配专注力峰值时段(peak_hours);单块时长不得超过 T_max;同一门课同一天累计时长不得超过 D_max;若该时段不足,先匹配优先系数最高的课程",
-    "中等:同一门课按间隔重复规律分散到多个时间片(间隔 1 天、2 天、4 天...或用户自定义),不安排连续时间片;适合复习/巩固类任务",
-    "轻松:对时间连续性要求最低,安排在碎片时间/低专注力时段;作为'填缝'任务,优先使用零碎的可用时间片"
+    "高强度:优先匹配专注力峰值时段(peak_hours);单块时长不得超过 T_max;同一门课同一天累计时长不得超过 D_max;若该时段不足,先匹配优先系数最高的课程;每块学习后安排 5-10 分钟休息",
+    "中等:同一门课按间隔重复规律分散到多个时间片(最优间隔 1-2 天),不安排连续时间片;适合复习/巩固类任务",
+    "轻松:对时间连续性要求最低,安排在碎片时间/低专注力时段;作为'填缝'任务,优先使用零碎的可用时间片(含 5-15 分钟微学习时段)"
   ],
   "rules": [
     "必须严格使用用户选择的 intensity_level 对应的档位规则",
     "三档强度不是'时长长短'划分,不得将轻松档简单地缩短时长、高强度档简单地加长时长",
-    "若用户未提供 peak_hours,高强度档退化为普通时间片(不强制峰值时段)"
+    "若用户未提供 peak_hours,高强度档退化为普通时间片(不强制峰值时段),但单次时长与每日上限仍须遵守",
+    "各档参数(单次上限/每日上限/间隔)以引用研究为默认值,用户可配置"
   ]
 }

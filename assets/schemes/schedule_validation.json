@@ -1,0 +1,109 @@
+{
+  "schemeName": "schedule_validation",
+  "schemeVersion": "1.0",
+  "algorithmName": "排课结果自检校验器",
+  "purpose": "在 AI 输出排课结果后、返回 APP 之前,对结果做一次全面自检,逐条校验硬性约束与软性建议,输出检查报告。不通过则提示 AI 修正后再输出,保证最终课表可落位、无冲突。",
+  "references": [],
+  "designIdea": "排课结果在交付前必须通过校验器检查。校验器按'硬性约束(必须全过)'与'软性建议(警告不阻断)'两级检查,输出逐条 PASS/FAIL 报告;任一硬性约束 FAIL 则整体不合格,AI 须修正后重新输出。",
+  "inputs": {
+    "schedule": "算法四输出的排课结果(order 数组)",
+    "courses": "输入课程清单(含时长)",
+    "available_slots_by_day": "算法二输出的可用时间片",
+    "user_settings": {
+      "intensity_level": "string",
+      "horizon_days": "int",
+      "start_label": "string, 现在/明天",
+      "window_description": "string",
+      "fixed_breaks": "string",
+      "time_preference": "string"
+    }
+  },
+  "outputs": {
+    "report": {
+      "passed": "bool, 全部硬性约束是否通过",
+      "checks": [
+        {
+          "id": "string, 检查项编号",
+          "level": "hard | warning",
+          "result": "PASS | FAIL",
+          "message": "string, 通过说明或失败原因"
+        }
+      ],
+      "summary": "string, 一句话结论(如'校验通过,可交付课表'或'3 项硬性约束未通过,需修正')"
+    }
+  },
+  "checks": [
+    {
+      "id": "C01",
+      "level": "hard",
+      "name": "课程完整性",
+      "detail": "order 数组必须包含全部输入课程,每门课恰好一次(courseId 唯一,无遗漏无重复)。"
+    },
+    {
+      "id": "C02",
+      "level": "hard",
+      "name": "时间窗约束",
+      "detail": "每门课的 startTime/endTime 必须落在对应日期的可用时间片内;不得早于'每日可用时间窗'开始、不得晚于结束。"
+    },
+    {
+      "id": "C03",
+      "level": "hard",
+      "name": "休息段排除",
+      "detail": "所有课程不得与每日固定休息段(如午休 12:00-13:30)、时间偏好中'不学习/有事'的时段重叠。"
+    },
+    {
+      "id": "C04",
+      "level": "hard",
+      "name": "课程不重叠",
+      "detail": "同一时间段内不得同时安排两门课(同日同时间区间无交叉)。"
+    },
+    {
+      "id": "C05",
+      "level": "hard",
+      "name": "时长匹配",
+      "detail": "每门课的排课总时长应等于其课程时长,允许因时间片粒度产生 ±10 分钟内的舍入。"
+    },
+    {
+      "id": "C06",
+      "level": "hard",
+      "name": "时间顺序",
+      "detail": "每门课的 startTime 必须早于 endTime;startDay 不得小于排课起始日(1=明天)。"
+    },
+    {
+      "id": "C07",
+      "level": "hard",
+      "name": "强度档位上限",
+      "detail": "同一天内,高强度档课程总时长不得超过 D_max(90 分钟),单块时长不得超过 T_max(50 分钟);中等档单块 ≤ 60 分钟;轻松档单块 ≤ 45 分钟。"
+    },
+    {
+      "id": "C08",
+      "level": "warning",
+      "name": "间隔重复建议",
+      "detail": "中等档课程若拆多段,相邻段之间建议间隔 1-2 天(间隔效应);同日连续多段发出警告。"
+    },
+    {
+      "id": "C09",
+      "level": "warning",
+      "name": "峰值时段建议",
+      "detail": "高强度档课程优先落在用户专注力峰值时段;若全部落在非峰值时段,发出警告(不阻断)。"
+    },
+    {
+      "id": "C10",
+      "level": "hard",
+      "name": "颜色唯一",
+      "detail": "每门课 color 必须互不相同(相邻课程避免同色),保证网格可区分。"
+    },
+    {
+      "id": "C11",
+      "level": "warning",
+      "name": "时间利用率",
+      "detail": "若存在失败课程且 wasted_minutes > 0,提示用户时间窗内有碎片未利用,建议调整时间窗或课程时长。"
+    }
+  ],
+  "rules": [
+    "所有 level=hard 的检查项必须全部 PASS,整体结果才为通过",
+    "任一 hard 检查 FAIL:AI 必须根据 message 修正排课结果后重新输出,不得直接交付",
+    "level=warning 的检查 FAIL 不阻断交付,但须在 summary 中说明,APP 可据此提示用户",
+    "校验器输出的 report 与排课结果一并返回 APP,APP 展示 summary 给用户"
+  ]
+}

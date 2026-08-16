@@ -25,6 +25,7 @@ class _FakeScheduler extends AiScheduler {
     AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
+    void Function(List<Map<String, String>> messages)? onMessages,
   }) async {
     return outcome;
   }
@@ -51,7 +52,15 @@ class _StreamingScheduler extends AiScheduler {
     AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
+    void Function(List<Map<String, String>> messages)? onMessages,
   }) async {
+    onMessages?.call([
+      {
+        'role': 'system',
+        'content': '你是学习排课规划助手。请按 ahp_priority_algorithm.json 计算优先系数。',
+      },
+      {'role': 'user', 'content': '测试用户请求'},
+    ]);
     if (onToken != null) _onToken.add(onToken);
     if (!_scheduled.isCompleted) _scheduled.complete();
     final completer = Completer<AiScheduleOutcome>();
@@ -204,7 +213,13 @@ void main() {
       availability: availability,
       windowDescription: '08:00-12:00 与 13:00-22:00',
       localeCode: 'zh-CN',
-      skillLoader: () async => null,
+      skillLoader: () async => const AiSkillPackage(
+        systemPrompt: '你是学习排课规划助手。请按 ahp_priority_algorithm.json 计算优先系数。',
+        userTemplate: '排课请求模板',
+        schemeFiles: {
+          'ahp_priority_algorithm.json': '{"algorithm":"ahp","steps":[]}',
+        },
+      ),
       scheduler: scheduler,
     );
 
@@ -221,8 +236,9 @@ void main() {
     );
     await tester.pump();
 
-    // 排课中：展示用户请求气泡（软件发给 AI 的短指令）+ AI 思考占位。
-    expect(find.textContaining('请使用软件技能为这 2 节课进行排序'), findsOneWidget);
+    // 排课中：展示用户请求气泡（完整提示词 system 内容）+ AI 思考占位。
+    expect(find.text('发给 AI 的完整提示词'), findsOneWidget);
+    expect(find.textContaining('你是学习排课规划助手'), findsOneWidget);
     expect(find.textContaining('正在思考排课方案'), findsOneWidget);
 
     // 等待 schedule() 注册 onToken，确保 emit 生效。
@@ -257,6 +273,17 @@ void main() {
     expect(find.textContaining('按截止日期优先安排'), findsOneWidget);
     expect(find.text('课程安排'), findsOneWidget);
     expect(find.textContaining('未排上'), findsNothing);
+
+    // 完整提示词内联文件名：提示词中引用的 ahp_priority_algorithm.json 带下划线可点击。
+    expect(find.text('发给 AI 的完整提示词'), findsOneWidget);
+    expect(find.textContaining('你是学习排课规划助手'), findsOneWidget);
+    expect(find.textContaining('ahp_priority_algorithm.json'), findsOneWidget);
+
+    // 点击内联文件名 → 弹出查看文件内容。
+    await tester.tap(find.textContaining('ahp_priority_algorithm.json'));
+    await tester.pumpAndSettle();
+    expect(find.text('ahp_priority_algorithm.json'), findsWidgets);
+    expect(find.textContaining('{"algorithm":"ahp"'), findsOneWidget);
 
     await taskFuture;
   });

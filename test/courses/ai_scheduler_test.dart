@@ -549,6 +549,54 @@ void main() {
     });
   });
 
+  group('parseNotesTimeRanges', () {
+    test('解析学习时段与不可用时段（用户实例）', () {
+      final parsed = parseNotesTimeRanges(
+        '9点到12点，13点半到晚上9点学习，下午1点到6点有事',
+      );
+      expect(parsed.learning, [
+        (9 * 60, 12 * 60),
+        (13 * 60 + 30, 21 * 60),
+      ]);
+      expect(parsed.blocked, [(13 * 60, 18 * 60)]);
+    });
+
+    test('无关键词时段默认视为学习时段', () {
+      final parsed = parseNotesTimeRanges('9:00-12:00 与 14:00-18:00');
+      expect(parsed.learning, [
+        (9 * 60, 12 * 60),
+        (14 * 60, 18 * 60),
+      ]);
+      expect(parsed.blocked, isEmpty);
+    });
+
+    test('空备注返回空', () {
+      final parsed = parseNotesTimeRanges('');
+      expect(parsed.learning, isEmpty);
+      expect(parsed.blocked, isEmpty);
+    });
+
+    test('"不学习"时段归入不可用（午休）', () {
+      final parsed = parseNotesTimeRanges(
+        '早上9点到晚上9点,中午12点到下午1点半不学习',
+      );
+      expect(parsed.learning, [(9 * 60, 21 * 60)]);
+      expect(parsed.blocked, [(12 * 60, 13 * 60 + 30)]);
+    });
+
+    test('下午时段 +12 小时（下午1点到6点有事）', () {
+      final parsed = parseNotesTimeRanges('9点到12点，下午1点到6点有事');
+      expect(parsed.learning, [(9 * 60, 12 * 60)]);
+      expect(parsed.blocked, [(13 * 60, 18 * 60)]);
+    });
+
+    test('不包含时间段时返回空', () {
+      final parsed = parseNotesTimeRanges('周三晚上有会');
+      expect(parsed.learning, isEmpty);
+      expect(parsed.blocked, isEmpty);
+    });
+  });
+
   group('AiUsageStats', () {
     test('按模型累计 token 与请求次数', () async {
       await AiUsageStats.instance.debugReset();
@@ -594,8 +642,7 @@ void main() {
     });
   });
 
-  group('availabilityFromDayWindow', () {
-    test('正常午休拆分为两个时段', () {
+  group('availabilityFromDayWindow', () {    test('正常午休拆分为两个时段', () {
       final days = availabilityFromDayWindow(
         startMinute: 8 * 60,
         lunchStartMinute: 12 * 60,

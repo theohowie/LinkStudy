@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../courses/ai_schedule_runner.dart';
 import '../courses/ai_scheduler.dart';
 import '../courses/link_course.dart';
+import '../courses/scheduler_engine.dart';
 import '../providers/timetable_provider.dart';
 import 'ai_schedule_progress_sheet.dart';
 import 'app_modal_sheet.dart';
@@ -67,19 +68,75 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   }
 
   String get _windowDescription {
-    final provider = widget.provider;
-    final availability = availabilityFromDayWindow(
-      startMinute: provider.generalDayStartMinute,
-      lunchStartMinute: provider.generalLunchStartMinute,
-      lunchEndMinute: provider.generalLunchEndMinute,
-      endMinute: provider.generalDayEndMinute,
-    );
+    final availability = _effectiveAvailability();
     final slots = availability.isEmpty
         ? const <AvailabilitySlot>[]
         : availability.first;
     return slots
         .map((s) => '${_hhmm(s.startMinute)}-${_hhmm(s.endMinute)}')
         .join(' 与 ');
+  }
+
+  /// 本次排课的实际可用时段：
+  /// 1. 若备注或时间偏好中解析出了学习时段 → 用学习时段减去不可用时段构建（用户输入优先，覆盖通用设置）；
+  /// 2. 否则回退通用显示设置（开始/午休/结束时间窗）。
+  List<List<AvailabilitySlot>> _effectiveAvailability() {
+    final provider = widget.provider;
+    final parsedNotes = parseNotesTimeRanges(_notes.text.trim());
+    final parsedPrefs = parseNotesTimeRanges(_timePreference.text.trim());
+    final learning = [...parsedNotes.learning, ...parsedPrefs.learning];
+    final blocked = [...parsedNotes.blocked, ...parsedPrefs.blocked];
+    if (learning.isNotEmpty) {
+      final slots = _subtractBlocked(learning, blocked);
+      return List.generate(
+        7,
+        (_) => slots.isEmpty ? defaultAvailability() : List.unmodifiable(slots),
+      );
+    }
+    return availabilityFromDayWindow(
+      startMinute: provider.generalDayStartMinute,
+      lunchStartMinute: provider.generalLunchStartMinute,
+      lunchEndMinute: provider.generalLunchEndMinute,
+      endMinute: provider.generalDayEndMinute,
+    );
+  }
+
+  /// 从学习时段中减去不可用时段，返回合并后的可用时段（分钟）。
+  static List<AvailabilitySlot> _subtractBlocked(
+    List<(int, int)> learning,
+    List<(int, int)> blocked,
+  ) {
+    final result = <AvailabilitySlot>[];
+    for (final l in learning) {
+      var cursor = l.$1;
+      final sortedBlocked = [...blocked]..sort((a, b) => a.$1.compareTo(b.$1));
+      for (final b in sortedBlocked) {
+        if (b.$2 <= cursor) continue;
+        if (b.$1 > cursor) {
+          result.add(AvailabilitySlot(startMinute: cursor, endMinute: b.$1));
+        }
+        cursor = b.$2 > cursor ? b.$2 : cursor;
+        if (cursor >= l.$2) break;
+      }
+      if (cursor < l.$2) {
+        result.add(AvailabilitySlot(startMinute: cursor, endMinute: l.$2));
+      }
+    }
+    // 合并相邻/重叠时段。
+    final merged = <AvailabilitySlot>[];
+    for (final s in result) {
+      if (merged.isNotEmpty && s.startMinute <= merged.last.endMinute) {
+        if (s.endMinute > merged.last.endMinute) {
+          merged[merged.length - 1] = AvailabilitySlot(
+            startMinute: merged.last.startMinute,
+            endMinute: s.endMinute,
+          );
+        }
+      } else {
+        merged.add(s);
+      }
+    }
+    return merged;
   }
 
   static String _hhmm(int minute) {
@@ -108,12 +165,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       timePreference: _timePreference.text.trim(),
       startMode: _startMode,
     );
-    final availability = availabilityFromDayWindow(
-      startMinute: provider.generalDayStartMinute,
-      lunchStartMinute: provider.generalLunchStartMinute,
-      lunchEndMinute: provider.generalLunchEndMinute,
-      endMinute: provider.generalDayEndMinute,
-    );
+    final availability = _effectiveAvailability();
     // 后台静默排课：弹窗切换为"排课中"状态（不关闭），可查看进度或主动退出，后台继续执行。
     unawaited(
       AiScheduleRunner.instance.start(

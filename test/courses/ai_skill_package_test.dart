@@ -9,12 +9,13 @@ void main() {
     expect(pkg, isNotNull);
     expect(pkg!.systemPrompt, contains('学习排课规划助手'));
     expect(pkg.userTemplate, contains('{{course_rows}}'));
-    // 5 份算法 JSON 全部加载。
+    // 6 份算法 JSON 全部加载。
     expect(pkg.schemeFiles.keys, {
       'ahp_priority_algorithm.json',
       'time_slices_algorithm.json',
       'intensity_matching_algorithm.json',
       'greedy_allocation_algorithm.json',
+      'schedule_validation.json',
       'output_format.json',
     });
     expect(pkg.schemeFiles['ahp_priority_algorithm.json'], contains('AHP'));

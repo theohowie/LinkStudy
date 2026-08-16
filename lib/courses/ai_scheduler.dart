@@ -130,12 +130,123 @@ class AiSchedulePrefs {
       );
 }
 
-/// AI 排课结果（成功：顺序 + 休息 + 每门课颜色 + 思路说明）。
+/// 从备注文本中解析学习时段与不可用时段（分钟）。
+///
+/// 支持中文表述，如：
+/// - "9点到12点，13点半到晚上9点学习，下午1点到6点有事"
+///   → 学习 [9:00-12:00, 13:30-21:00]，不可用 [13:00-18:00]
+/// - "周一到周三晚上有课，周四下午开会"（无法可靠解析时返回空）
+///
+/// 规则：
+/// - 提取 "X点/点半 到 Y点/点半"、"X:MM-Y:MM" 形式的时间段；
+/// - 时间段后紧跟"学习/学/可用/安排"等词 → 学习时段；
+/// - 时间段后紧跟"有事/不可用/不学/没空/开会/有课"等词 → 不可用时段；
+/// - 无明确关键词的时间段默认视为学习时段（用户多半在描述可学习时间）。
+/// 无法解析出任何时段时返回空列表（调用方回退通用设置）。
+({List<(int, int)> learning, List<(int, int)> blocked}) parseNotesTimeRanges(
+  String notes,
+) {
+  final learning = <(int, int)>[];
+  final blocked = <(int, int)>[];
+  if (notes.trim().isEmpty) return (learning: learning, blocked: blocked);
+
+  // 时间段模式：起始 到 结束。支持 "9点到12点"、"13点半到晚上9点"、"9:00-12:00"、"1点到6点"、"下午1点到6点"。
+  // "点半" 用 (半) 捕获；起始/结束的 "下午/晚上/夜间" 等前缀分别用 g2/g5 捕获（小时 ≤ 11 时 +12）。
+  final pattern = RegExp(
+    r'(凌晨|早上|上午|中午|下午|傍晚|晚上|晚间|夜里|深夜)?'
+    r'(\d{1,2})(?:点(半)?|:(\d{2}))?\s*(?:到|至|-|—|~)\s*'
+    r'(凌晨|早上|上午|中午|下午|傍晚|晚上|晚间|夜里|深夜)?'
+    r'(\d{1,2})(?:点(半)?|:(\d{2}))?',
+  );
+  for (final m in pattern.allMatches(notes)) {
+    final start = _parseTimeToken(
+      m.group(2),
+      m.group(3),
+      m.group(4),
+      pmPrefix: m.group(1),
+    );
+    var end = _parseTimeToken(
+      m.group(6),
+      m.group(7),
+      m.group(8),
+      pmPrefix: m.group(5),
+    );
+    // 结束无前缀但起始带"下午/晚上"语境且结束原始小时为 1-11 → 结束也视为下午（如"下午1点到6点"）。
+    if (end != null &&
+        start != null &&
+        m.group(5) == null &&
+        m.group(1) != null &&
+        RegExp(r'下午|傍晚|晚上|晚间|夜里|深夜').hasMatch(m.group(1)!) &&
+        end > 0 &&
+        end < 12 * 60 &&
+        end <= start) {
+      end += 12 * 60;
+    }
+    if (start == null || end == null || end <= start) continue;
+    // 判断该时段语义：只看紧跟时段结束后的少量字符（避免跨时段误判）。
+    // 否定词（不学/不学习/没空/休息/有事等）优先 → 该时段为不可用；
+    // 明确学习词（学习/学/可用/安排/用来学）→ 学习时段；无语义词 → 默认学习。
+    final after = notes
+        .substring(m.end, m.end + 6 > notes.length ? notes.length : m.end + 6)
+        .trim();
+    final isBlocked = RegExp(r'不学|不学习|有事|不可用|没空|开会|有课|上班|休息|忙').hasMatch(after);
+    if (isBlocked) {
+      blocked.add((start, end));
+    } else {
+      // 无语义关键词：默认视为学习时段（用户多半在描述可学习时间）。
+      learning.add((start, end));
+    }
+  }
+  // 去重并排序。
+  final dedupLearning = <(int, int)>[];
+  for (final r in learning) {
+    if (!dedupLearning.any((x) => x.$1 == r.$1 && x.$2 == r.$2)) {
+      dedupLearning.add(r);
+    }
+  }
+  dedupLearning.sort((a, b) => a.$1.compareTo(b.$1));
+  final dedupBlocked = <(int, int)>[];
+  for (final r in blocked) {
+    if (!dedupBlocked.any((x) => x.$1 == r.$1 && x.$2 == r.$2)) {
+      dedupBlocked.add(r);
+    }
+  }
+  dedupBlocked.sort((a, b) => a.$1.compareTo(b.$1));
+  return (learning: dedupLearning, blocked: dedupBlocked);
+}
+
+/// 解析时间 token → 分钟；失败返回 null。
+/// [halfRaw] 为 "半"（半点 = 30 分钟）；[minuteRaw] 为 "HH:MM" 的分钟部分。
+/// [pmPrefix] 为 "下午/傍晚/晚上/晚间/夜里/深夜" 等前缀：小时 ≤ 11 时 +12 小时；
+/// "中午" 保持 12；"凌晨/早上/上午" 不调整。
+int? _parseTimeToken(
+  String? hourRaw,
+  String? halfRaw,
+  String? minuteRaw, {
+  String? pmPrefix,
+}) {
+  if (hourRaw == null) return null;
+  var hour = int.tryParse(hourRaw);
+  if (hour == null || hour < 0 || hour > 23) return null;
+  final pm =
+      pmPrefix != null && RegExp(r'下午|傍晚|晚上|晚间|夜里|深夜').hasMatch(pmPrefix);
+  final noon = pmPrefix == '中午';
+  if (pm && hour < 12) hour += 12;
+  if (noon && hour == 0) hour = 12;
+  final minute = halfRaw != null
+      ? 30
+      : (minuteRaw == null ? 0 : int.tryParse(minuteRaw) ?? 0);
+  if (minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+/// AI 排课结果（成功：顺序 + 休息 + 每门课颜色 + 思路说明 + 可选的具体时间安排）。
 class AiScheduleSuccess {
   const AiScheduleSuccess({
     required this.ordered,
     required this.reason,
     this.colors = const {},
+    this.placements = const [],
   });
 
   final List<OrderedCourse> ordered;
@@ -143,6 +254,9 @@ class AiScheduleSuccess {
 
   /// 每门课的建议颜色（courseId → ARGB 颜色值，来自 AI 输出的 #RRGGBB）。
   final Map<String, int> colors;
+
+  /// AI 给出的具体时间安排（来自新技能文件包输出契约）；为空时由本地引擎自行落位。
+  final List<AiPlacement> placements;
 }
 
 /// AI 排课失败类型。
@@ -197,6 +311,7 @@ class AiScheduler {
   /// [skillPackage] 可选：排课技能文件包（md 提示词 + 算法 JSON）。提供时消息改为
   /// 三段式（system=技能系统提示词 / user=技能文件内容 / user=填充后的排课请求）；
   /// 不提供时回退内置精简 prompt（降级路径）。
+  /// [onMessages] 请求发送前回调实际构建的完整消息（用于面板展示"发给 AI 的提示词"）。
   Future<AiScheduleOutcome> schedule({
     required List<LinkCourse> courses,
     required AiSchedulePrefs prefs,
@@ -205,6 +320,7 @@ class AiScheduler {
     AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
+    void Function(List<Map<String, String>> messages)? onMessages,
   }) async {
     if (config.apiKey.trim().isEmpty || config.baseUrl.trim().isEmpty) {
       return AiScheduleOutcomeError(
@@ -223,6 +339,14 @@ class AiScheduler {
     final uri = Uri.parse(
       '${config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/chat/completions',
     );
+    final messages = _buildMessages(
+      courses: courses,
+      prefs: prefs,
+      config: config,
+      localeCode: localeCode,
+      skillPackage: skillPackage,
+    );
+    onMessages?.call(messages);
     final request = http.Request('POST', uri)
       ..headers.addAll({
         'Content-Type': 'application/json',
@@ -232,13 +356,7 @@ class AiScheduler {
         'model': config.model.trim(),
         'temperature': 0.3,
         if (onToken != null) 'stream': true,
-        'messages': _buildMessages(
-          courses: courses,
-          prefs: prefs,
-          config: config,
-          localeCode: localeCode,
-          skillPackage: skillPackage,
-        ),
+        'messages': messages,
       });
 
     final http.StreamedResponse streamed;
@@ -579,6 +697,12 @@ class AiScheduler {
         .replaceAll('{{window_description}}', window)
         .replaceAll('{{fixed_breaks}}', fixedBreaks)
         .replaceAll(
+          '{{time_preference}}',
+          prefs.timePreference.trim().isEmpty
+              ? '无'
+              : prefs.timePreference.trim(),
+        )
+        .replaceAll(
           '{{one_off_blocks}}',
           prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim(),
         )
@@ -699,6 +823,7 @@ class AiScheduler {
       }
       final ordered = <OrderedCourse>[];
       final colors = <String, int>{};
+      final placements = <AiPlacement>[];
       for (final item in rawItems) {
         if (item is! Map) continue;
         final courseId = item['courseId'];
@@ -713,17 +838,57 @@ class AiScheduler {
         if (color != null) {
           colors[courseId.trim()] = color;
         }
+        // 技能文件包输出契约：可含 startDay(1=起始日)/startTime/endTime。
+        final placement = _parsePlacement(item);
+        if (placement != null) {
+          placements.add(placement);
+        }
       }
       // JSON 结构合法但没有任何有效课程 → 返回空列表，由调用方判定 empty。
       return AiScheduleSuccess(
         ordered: ordered,
         reason: reason.trim(),
         colors: colors,
+        placements: placements,
       );
     } catch (e) {
       debugPrint('[ai_scheduler] content parse failed: $e');
       return null;
     }
+  }
+
+  /// 解析单条 AI 输出的具体时间（startDay/startTime/endTime）；缺任一字段返回 null。
+  AiPlacement? _parsePlacement(Map<dynamic, dynamic> item) {
+    final courseId = item['courseId'];
+    if (courseId is! String || courseId.trim().isEmpty) return null;
+    final startDayRaw = item['startDay'];
+    final startTime = item['startTime'];
+    final endTime = item['endTime'];
+    if (startDayRaw is! num || startTime is! String || endTime is! String) {
+      return null;
+    }
+    final start = _parseHhMm(startTime);
+    final end = _parseHhMm(endTime);
+    if (start == null || end == null || end <= start) return null;
+    final dayOffset = startDayRaw.toInt() - 1;
+    if (dayOffset < 0) return null;
+    return AiPlacement(
+      courseId: courseId.trim(),
+      dayOffset: dayOffset,
+      startMinute: start,
+      endMinute: end,
+    );
+  }
+
+  /// 解析 "HH:MM" → 分钟；失败返回 null。
+  static int? _parseHhMm(String value) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value.trim());
+    if (m == null) return null;
+    final hour = int.tryParse(m.group(1)!);
+    final minute = int.tryParse(m.group(2)!);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return hour * 60 + minute;
   }
 
   /// 解析颜色：#RRGGBB / #AARRGGBB → ARGB int；数字直接取整；失败返回 null。

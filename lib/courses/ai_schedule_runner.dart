@@ -48,6 +48,12 @@ class AiScheduleTask {
   /// 流式思考过程：AI 生成的原始输出（实时累积，进度面板对话式展示）。
   String thinking = '';
 
+  /// 实际发送给 AI 的完整消息（面板展示"发给 AI 的提示词"用）。
+  List<Map<String, String>> sentMessages = const [];
+
+  /// 本次排课使用的技能文件包（面板展示提示词内联文件名链接用）。
+  AiSkillPackage? skillPackage;
+
   /// 结果是否已被用户查看过（控制排课按钮是否优先打开进度面板）。
   bool viewed = false;
 }
@@ -149,6 +155,8 @@ class AiScheduleRunner extends ChangeNotifier {
       // 加载排课技能文件包（md 提示词 + 算法 JSON）；加载失败时降级内置 prompt。
       final skillPackage =
           await (skillLoader ?? const AiSkillPackageLoader().load)();
+      task.skillPackage = skillPackage;
+      notifyListeners();
 
       final outcome = await (scheduler ?? AiScheduler()).schedule(
         courses: courses,
@@ -156,6 +164,10 @@ class AiScheduleRunner extends ChangeNotifier {
         config: requestConfig,
         localeCode: localeCode,
         skillPackage: skillPackage,
+        onMessages: (messages) {
+          task.sentMessages = messages;
+          notifyListeners();
+        },
         onToken: (delta) {
           task.thinking += delta;
           notifyListeners();
@@ -189,6 +201,7 @@ class AiScheduleRunner extends ChangeNotifier {
             availabilityByWeekday: task.availability,
             startFromNow: prefs.startMode == ScheduleStartMode.now,
             courseColors: value.colors,
+            aiPlacements: value.placements,
           );
           task.placedCount = result.placements.length;
           task.failureCount = result.failures.length;

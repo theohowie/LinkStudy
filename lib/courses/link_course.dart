@@ -9,6 +9,23 @@ import 'scheduler_engine.dart';
 /// 课程优先级。
 enum CoursePriority { high, medium, low }
 
+/// AI 建议的单门课具体时间安排（AI 输出的 startDay/startTime/endTime）。
+class AiPlacement {
+  const AiPlacement({
+    required this.courseId,
+    required this.dayOffset, // 0=排课起始日（明天/今天），对应 startDay-1
+    required this.startMinute,
+    required this.endMinute,
+  });
+
+  final String courseId;
+  final int dayOffset;
+  final int startMinute;
+  final int endMinute;
+
+  int get durationMinutes => endMinute - startMinute;
+}
+
 /// 每日一个可用时段（如 19:00-22:00）。
 class AvailabilitySlot {
   final int startMinute;
@@ -18,8 +35,10 @@ class AvailabilitySlot {
 
   int get durationMinutes => endMinute - startMinute;
 
-  Map<String, dynamic> toJson() =>
-      {'startMinute': startMinute, 'endMinute': endMinute};
+  Map<String, dynamic> toJson() => {
+    'startMinute': startMinute,
+    'endMinute': endMinute,
+  };
 
   factory AvailabilitySlot.fromJson(Map<String, dynamic> json) =>
       AvailabilitySlot(
@@ -29,10 +48,11 @@ class AvailabilitySlot {
 }
 
 /// 日期 → epochDay（自 1970-01-01 UTC 起的天数，仅日期部分；与 deadlineDay 同约定）。
-int epochDayOf(DateTime date) =>
-    DateTime.utc(date.year, date.month, date.day)
-        .difference(DateTime.utc(1970, 1, 1))
-        .inDays;
+int epochDayOf(DateTime date) => DateTime.utc(
+  date.year,
+  date.month,
+  date.day,
+).difference(DateTime.utc(1970, 1, 1)).inDays;
 
 /// epochDay → 本地日期（仅日期部分，时间归零）。
 DateTime localDateFromEpochDay(int day) {
@@ -64,7 +84,9 @@ List<List<AvailabilitySlot>> availabilityFromDayWindow({
     slots.add(AvailabilitySlot(startMinute: lunchEnd, endMinute: eveningEnd));
   }
   if (slots.isEmpty && eveningEnd > morningStart) {
-    slots.add(AvailabilitySlot(startMinute: morningStart, endMinute: eveningEnd));
+    slots.add(
+      AvailabilitySlot(startMinute: morningStart, endMinute: eveningEnd),
+    );
   }
   return List.generate(
     7,
@@ -91,22 +113,22 @@ class ScheduleSlot {
   });
 
   Map<String, dynamic> toJson() => {
-        'courseId': courseId,
-        'day': epochDay,
-        'weekday': weekday,
-        'startMinute': startMinute,
-        'endMinute': endMinute,
-        'color': colorValue,
-      };
+    'courseId': courseId,
+    'day': epochDay,
+    'weekday': weekday,
+    'startMinute': startMinute,
+    'endMinute': endMinute,
+    'color': colorValue,
+  };
 
   factory ScheduleSlot.fromJson(Map<String, dynamic> json) => ScheduleSlot(
-        courseId: json['courseId'] as String,
-        epochDay: (json['day'] as num?)?.toInt(),
-        weekday: (json['weekday'] as num).toInt(),
-        startMinute: (json['startMinute'] as num).toInt(),
-        endMinute: (json['endMinute'] as num).toInt(),
-        colorValue: (json['color'] as num?)?.toInt(),
-      );
+    courseId: json['courseId'] as String,
+    epochDay: (json['day'] as num?)?.toInt(),
+    weekday: (json['weekday'] as num).toInt(),
+    startMinute: (json['startMinute'] as num).toInt(),
+    endMinute: (json['endMinute'] as num).toInt(),
+    colorValue: (json['color'] as num?)?.toInt(),
+  );
 }
 
 /// 一条网课课程（悬浮窗采集入库）。
@@ -147,29 +169,28 @@ class LinkCourse {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'url': url,
-        'title': title,
-        'durationMinutes': durationMinutes,
-        'createdAt': createdAt.toIso8601String(),
-        'deadlineDay': deadlineDay,
-        'priority': priority.name,
-      };
+    'id': id,
+    'url': url,
+    'title': title,
+    'durationMinutes': durationMinutes,
+    'createdAt': createdAt.toIso8601String(),
+    'deadlineDay': deadlineDay,
+    'priority': priority.name,
+  };
 
   factory LinkCourse.fromJson(Map<String, dynamic> json) => LinkCourse(
-        id: json['id'] as String,
-        url: json['url'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
-        createdAt:
-            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        deadlineDay: (json['deadlineDay'] as num?)?.toInt(),
-        priority: CoursePriority.values.firstWhere(
-          (p) => p.name == json['priority'],
-          orElse: () => CoursePriority.medium,
-        ),
-      );
+    id: json['id'] as String,
+    url: json['url'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    deadlineDay: (json['deadlineDay'] as num?)?.toInt(),
+    priority: CoursePriority.values.firstWhere(
+      (p) => p.name == json['priority'],
+      orElse: () => CoursePriority.medium,
+    ),
+  );
 }
 
 /// 课程存储（本地 JSON 文件，原子写 + .bak 备份）。
@@ -214,9 +235,9 @@ class LinkCourseStore extends ChangeNotifier {
               .toList();
         } else if (decoded is Map<String, dynamic>) {
           final data = decoded;
-          _courses = _list(data['courses'])
-              .map((e) => LinkCourse.fromJson(e as Map<String, dynamic>))
-              .toList();
+          _courses = _list(
+            data['courses'],
+          ).map((e) => LinkCourse.fromJson(e as Map<String, dynamic>)).toList();
           _slots = _list(data['slots'])
               .map((e) => ScheduleSlot.fromJson(e as Map<String, dynamic>))
               .toList();
@@ -264,6 +285,8 @@ class LinkCourseStore extends ChangeNotifier {
   /// [availabilityByWeekday] 为每天可用时段（来自通用显示设置）。
   /// [startFromNow] true=从现在开始（裁剪今天已过时段）；false=从明天开始（今天不排）。
   /// [courseColors] 每门课在网格展示的颜色（courseId → ARGB，来自 AI 建议）。
+  /// [aiPlacements] AI 给出的具体时间安排（技能文件包输出契约）：
+  /// 优先采用（校验在窗口内、时长匹配、不重叠）；校验失败的课程回退本地贪心落位。
   Future<SchedulingResult> scheduleWithOrder({
     required List<String> courseIds,
     required List<OrderedCourse> ordered,
@@ -271,6 +294,7 @@ class LinkCourseStore extends ChangeNotifier {
     required List<List<AvailabilitySlot>> availabilityByWeekday,
     bool startFromNow = true,
     Map<String, int>? courseColors,
+    List<AiPlacement> aiPlacements = const [],
   }) async {
     final ids = courseIds.toSet();
     final pending = _courses.where((c) => ids.contains(c.id)).toList();
@@ -284,29 +308,125 @@ class LinkCourseStore extends ChangeNotifier {
     final today = startFromNow
         ? DateTime.now()
         : DateTime.now().add(const Duration(days: 1));
-    final result = scheduleCourses(
-      pending: pending,
-      availabilityByWeekday: availabilityByWeekday,
-      occupied: _occupiedFromSlots(_slots),
-      today: today,
-      ordered: ordered.isEmpty ? null : ordered,
-      horizonDays: days.clamp(1, 30),
-      startFromNow: startFromNow,
+
+    final placements = <SchedulePlacement>[];
+    final failures = <({String courseId, String reason})>[];
+    final colors = _assignColors(
+      courseIds: ids,
+      aiColors: courseColors ?? const {},
     );
+
+    // 阶段 A：优先采用 AI 给出的具体时间（校验合法性）。
+    final adopted = <String>{};
+    if (aiPlacements.isNotEmpty) {
+      for (final p in aiPlacements) {
+        final course = pending.where((c) => c.id == p.courseId).firstOrNull;
+        if (course == null || adopted.contains(p.courseId)) continue;
+        // 校验：窗口内天数、时长匹配、不与已采用槽位重叠。
+        if (p.dayOffset < 0 || p.dayOffset >= days.clamp(1, 30)) continue;
+        if (p.durationMinutes != course.durationMinutes) continue;
+        final day = epochDayOf(today) + p.dayOffset;
+        final weekday = localDateFromEpochDay(day).weekday;
+        final overlaps = placements.any(
+          (q) => q.day == day && p.startMinute < q.end && p.endMinute > q.start,
+        );
+        if (overlaps) continue;
+        // 校验：落在当天可用时段内。
+        final avail = availabilityByWeekday.length >= weekday
+            ? availabilityByWeekday[weekday - 1]
+            : const <AvailabilitySlot>[];
+        final inWindow = avail.any(
+          (seg) =>
+              p.startMinute >= seg.startMinute && p.endMinute <= seg.endMinute,
+        );
+        if (!inWindow) continue;
+        adopted.add(p.courseId);
+        placements.add((
+          courseId: p.courseId,
+          day: day,
+          weekday: weekday,
+          start: p.startMinute,
+          end: p.endMinute,
+        ));
+      }
+    }
+
+    // 阶段 B：未采用 AI 时间的课程按顺序贪心落位。
+    // 注意：occupied 必须包含阶段 A 已采用的槽位，否则本地落位会与 AI 落位重叠。
+    final pendingRest = pending.where((c) => !adopted.contains(c.id)).toList();
+    if (pendingRest.isNotEmpty) {
+      final occupiedMap = _occupiedFromSlots(_slots);
+      for (final p in placements) {
+        (occupiedMap[p.weekday] ??= []).add((start: p.start, end: p.end));
+      }
+      final result = scheduleCourses(
+        pending: pendingRest,
+        availabilityByWeekday: availabilityByWeekday,
+        occupied: occupiedMap,
+        today: today,
+        ordered: ordered.isEmpty ? null : ordered,
+        horizonDays: days.clamp(1, 30),
+        startFromNow: startFromNow,
+      );
+      placements.addAll(result.placements);
+      failures.addAll(result.failures);
+    }
+
     final added = [
-      for (final p in result.placements)
+      for (final p in placements)
         ScheduleSlot(
           courseId: p.courseId,
           epochDay: p.day,
           weekday: p.weekday,
           startMinute: p.start,
           endMinute: p.end,
-          colorValue: courseColors?[p.courseId],
+          colorValue: colors[p.courseId],
         ),
     ];
     _slots = [..._slots, ...added];
     notifyListeners();
     await _persist();
+    return SchedulingResult(placements: placements, failures: failures);
+  }
+
+  /// 课程颜色兜底：AI 给了颜色的课程用 AI 色；其余按固定调色板顺序分配，
+  /// 保证每门课颜色不同（修复"颜色又一样"问题）。
+  static const _palette = [
+    0xFF4D6BFE, // 蓝
+    0xFF22A06B, // 绿
+    0xFFE8590C, // 橙
+    0xFF9C36B5, // 紫
+    0xFFE03131, // 红
+    0xFF0CA678, // 青绿
+    0xFFF08C00, // 琥珀
+    0xFF1971C2, // 深蓝
+    0xFFE64980, // 玫红
+    0xFF2F9E44, // 草绿
+  ];
+
+  static Map<String, int> _assignColors({
+    required Set<String> courseIds,
+    required Map<String, int> aiColors,
+  }) {
+    final result = <String, int>{};
+    final orderedIds = courseIds.toList();
+    var paletteIndex = 0;
+    final used = <int>{};
+    for (final id in orderedIds) {
+      final ai = aiColors[id];
+      if (ai != null && !used.contains(ai)) {
+        result[id] = ai;
+        used.add(ai);
+        continue;
+      }
+      // AI 色缺失或重复 → 从调色板取下一个未用色。
+      while (used.contains(_palette[paletteIndex % _palette.length])) {
+        paletteIndex++;
+      }
+      result[id] = _palette[paletteIndex % _palette.length];
+      used.add(result[id]!);
+      paletteIndex++;
+    }
     return result;
   }
 
@@ -345,7 +465,10 @@ class LinkCourseStore extends ChangeNotifier {
   ) {
     final occupied = <int, List<({int start, int end})>>{};
     for (final s in slots) {
-      (occupied[s.weekday] ??= []).add((start: s.startMinute, end: s.endMinute));
+      (occupied[s.weekday] ??= []).add((
+        start: s.startMinute,
+        end: s.endMinute,
+      ));
     }
     return occupied;
   }
@@ -415,8 +538,7 @@ class LinkCourseStore extends ChangeNotifier {
         'courses': _courses.map((c) => c.toJson()).toList(),
         'slots': _slots.map((s) => s.toJson()).toList(),
         'availability': [
-          for (final day in _availability)
-            day.map((a) => a.toJson()).toList(),
+          for (final day in _availability) day.map((a) => a.toJson()).toList(),
         ],
       });
       final tmp = File('${file.path}.tmp');
@@ -433,8 +555,7 @@ class LinkCourseStore extends ChangeNotifier {
     }
   }
 
-  static List<dynamic> _list(Object? value) =>
-      value is List ? value : const [];
+  static List<dynamic> _list(Object? value) => value is List ? value : const [];
 
   static List<List<AvailabilitySlot>> _decodeAvailability(Object? value) {
     if (value is! List || value.length != 7) {
@@ -447,13 +568,18 @@ class LinkCourseStore extends ChangeNotifier {
               .whereType<Map<String, dynamic>>()
               .map(AvailabilitySlot.fromJson)
               .toList()
-          else
+        else
           <AvailabilitySlot>[],
     ];
   }
 
-  static String _newId() =>
-      'course_${DateTime.now().microsecondsSinceEpoch}';
+  static int _idSeq = 0;
+
+  /// 生成唯一课程 id：微秒时间戳 + 进程内递增序号，防止同一微秒内快速创建时撞 id。
+  static String _newId() {
+    _idSeq++;
+    return 'course_${DateTime.now().microsecondsSinceEpoch}_$_idSeq';
+  }
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

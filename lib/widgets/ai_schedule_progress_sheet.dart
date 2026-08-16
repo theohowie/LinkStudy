@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../courses/ai_schedule_runner.dart';
@@ -70,37 +71,6 @@ class AiScheduleConversation extends StatelessWidget {
           const SizedBox(width: 8),
           trailing,
         ],
-      ),
-    );
-  }
-
-  /// 用户侧气泡：软件发给 AI 的指令（像发出的一条聊天消息）。
-  Widget _userBubble(BuildContext context, AiScheduleTask task) {
-    final theme = Theme.of(context);
-    final count = task.courseIds.length;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(14),
-            topRight: Radius.circular(14),
-            bottomLeft: Radius.circular(14),
-            bottomRight: Radius.circular(4),
-          ),
-        ),
-        child: Text(
-          '请使用软件技能为这 $count 节课进行排序,注意用户的要求设置。',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onPrimaryContainer,
-            height: 1.45,
-          ),
-        ),
       ),
     );
   }
@@ -235,8 +205,8 @@ class AiScheduleConversation extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // 对话式展示：用户请求 → AI 流式输出。
-            _userBubble(context, task),
+            // 对话式展示：用户请求（完整提示词，文件名内联可点击）→ AI 流式输出。
+            _UserPromptBubble(task: task),
             const SizedBox(height: 12),
             _aiBubble(context, task),
             const SizedBox(height: 12),
@@ -337,6 +307,164 @@ class AiScheduleProgressSheet extends StatelessWidget {
           child: AiScheduleConversation(store: store),
         );
       },
+    );
+  }
+}
+
+/// 用户侧气泡：显示完整提示词（从"你是…"开始），
+/// 提示词中引用的文件名（如 *.json / *.md）带下划线、点击可查看文件内容。
+class _UserPromptBubble extends StatelessWidget {
+  const _UserPromptBubble({required this.task});
+
+  final AiScheduleTask task;
+
+  Future<void> _showFile(BuildContext context, String name, String content) {
+    return showAppModalSheet<void>(
+      context: context,
+      maxWidth: appSheetWidthMedium,
+      builder: (sheetContext) => AppSheetScaffold(
+        heightFactor: 0.9,
+        title: Text(name),
+        subtitle: const Text('随排课请求一起发送给 AI 的技能文件'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+        child: SingleChildScrollView(
+          child: SelectableText(
+            content,
+            style: const TextStyle(fontSize: 12, height: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 把提示词文本拆成 spans：文件名（*.json / *.md）渲染为带下划线的链接。
+  List<InlineSpan> _buildSpans(
+    BuildContext context,
+    String text,
+    Map<String, String> files,
+  ) {
+    final theme = Theme.of(context);
+    final linkColor = theme.colorScheme.primary;
+    final pattern = RegExp(r'[\w-]+\.(?:json|md)');
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    for (final m in pattern.allMatches(text)) {
+      if (m.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, m.start)));
+      }
+      final name = m.group(0)!;
+      spans.add(
+        TextSpan(
+          text: name,
+          style: TextStyle(
+            color: linkColor,
+            decoration: TextDecoration.underline,
+            decorationColor: linkColor.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w600,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              final content = files[name];
+              if (content != null) _showFile(context, name, content);
+            },
+        ),
+      );
+      cursor = m.end;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+    return spans;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final pkg = task.skillPackage;
+    final messages = task.sentMessages;
+    // 完整提示词优先取实际发送的 system 消息；否则取技能包系统提示词。
+    String? prompt;
+    Map<String, String> files = {};
+    for (final m in messages) {
+      if (m['role'] == 'system') {
+        prompt = m['content'];
+        break;
+      }
+    }
+    if (prompt == null && pkg != null) {
+      prompt = pkg.systemPrompt;
+    }
+    if (pkg != null) {
+      files = {
+        ...pkg.schemeFiles,
+        'system_prompt.md': pkg.systemPrompt,
+        'user_prompt.md': pkg.userTemplate,
+      };
+    }
+    final text = (prompt ?? '').trim();
+    // 去掉 Markdown 标题行（# 开头）。
+    final cleaned = text.replaceFirst(RegExp(r'^#.*\n+'), '');
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.9,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(14),
+            topRight: Radius.circular(14),
+            bottomLeft: Radius.circular(14),
+            bottomRight: Radius.circular(4),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '发给 AI 的完整提示词',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer.withValues(
+                  alpha: 0.7,
+                ),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (cleaned.isEmpty)
+              Text(
+                '请使用软件技能为这 ${task.courseIds.length} 节课进行排序,注意用户的要求设置。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  height: 1.45,
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: SingleChildScrollView(
+                  child: Text.rich(
+                    TextSpan(
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                        height: 1.45,
+                      ),
+                      children: _buildSpans(context, cleaned, files),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

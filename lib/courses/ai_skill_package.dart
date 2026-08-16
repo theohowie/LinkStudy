@@ -30,6 +30,7 @@ class AiSkillPackageLoader {
     'assets/schemes/time_slices_algorithm.json',
     'assets/schemes/intensity_matching_algorithm.json',
     'assets/schemes/greedy_allocation_algorithm.json',
+    'assets/schemes/schedule_validation.json',
     'assets/schemes/output_format.json',
   ];
 

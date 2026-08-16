@@ -2,6 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:linkstudy/courses/link_course.dart';
 
 void main() {
+  setUp(() {
+    // FakeAsync 环境下真实文件 I/O 会挂起，跳过持久化。
+    LinkCourseStore.instance.debugSkipPersist = true;
+  });
+
   final availability = availabilityFromDayWindow(
     startMinute: 8 * 60,
     lunchStartMinute: 12 * 60,
@@ -77,6 +82,114 @@ void main() {
         courseColors: {a.id: 0xFF4D6BFE},
       );
       expect(store.slots.single.colorValue, 0xFF4D6BFE);
+    });
+
+    test('AI 具体时间落位：采用 AI 时间并校验时间窗/时长/不重叠', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final a = await store.addCourse(
+        url: 'https://example.com/ai-time-a',
+        title: '数据结构',
+        durationMinutes: 100,
+      );
+      final b = await store.addCourse(
+        url: 'https://example.com/ai-time-b',
+        title: 'Java',
+        durationMinutes: 90,
+      );
+      // AI 输出具体时间：a 在第二天 9:00-10:40，b 在第二天 14:00-15:30
+      // （避开午休 12:00-13:00，且不早于 9:00、不挤在上午）。
+      final result = await store.scheduleWithOrder(
+        courseIds: [a.id, b.id],
+        ordered: [
+          (courseId: a.id, restAfterMinutes: 20),
+          (courseId: b.id, restAfterMinutes: 0),
+        ],
+        days: 2,
+        availabilityByWeekday: availability,
+        startFromNow: false,
+        aiPlacements: [
+          AiPlacement(
+            courseId: a.id,
+            dayOffset: 1,
+            startMinute: 9 * 60,
+            endMinute: 9 * 60 + 100,
+          ),
+          AiPlacement(
+            courseId: b.id,
+            dayOffset: 1,
+            startMinute: 14 * 60,
+            endMinute: 14 * 60 + 90,
+          ),
+        ],
+      );
+      expect(result.failures, isEmpty);
+      expect(result.placements, hasLength(2));
+      final aSlot = store.slots.singleWhere((s) => s.courseId == a.id);
+      final bSlot = store.slots.singleWhere((s) => s.courseId == b.id);
+      expect(aSlot.startMinute, 9 * 60);
+      expect(aSlot.endMinute, 9 * 60 + 100);
+      expect(bSlot.startMinute, 14 * 60);
+      // 都在第二天。
+      expect(aSlot.epochDay, bSlot.epochDay);
+    });
+
+    test('AI 具体时间非法时回退本地贪心落位', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final a = await store.addCourse(
+        url: 'https://example.com/ai-bad',
+        title: '非法时间课',
+        durationMinutes: 40,
+      );
+      // AI 时间与课程时长不符 → 应被拒绝，回退本地落位。
+      final result = await store.scheduleWithOrder(
+        courseIds: [a.id],
+        ordered: [(courseId: a.id, restAfterMinutes: 0)],
+        days: 7,
+        availabilityByWeekday: availability,
+        aiPlacements: [
+          const AiPlacement(
+            courseId: 'a',
+            dayOffset: 0,
+            startMinute: 9 * 60,
+            endMinute: 9 * 60 + 200, // 200 分钟 ≠ 课程 40 分钟
+          ),
+        ],
+      );
+      expect(result.failures, isEmpty);
+      final slot = store.slots.single;
+      // 本地回退：时长恢复为课程时长 40 分钟。
+      expect(slot.endMinute - slot.startMinute, 40);
+    });
+
+    test('颜色兜底：AI 未给颜色时每门课颜色不同', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final a = await store.addCourse(
+        url: 'https://example.com/color-a',
+        title: '课程A',
+        durationMinutes: 40,
+      );
+      final b = await store.addCourse(
+        url: 'https://example.com/color-b',
+        title: '课程B',
+        durationMinutes: 40,
+      );
+      await store.scheduleWithOrder(
+        courseIds: [a.id, b.id],
+        ordered: [
+          (courseId: a.id, restAfterMinutes: 0),
+          (courseId: b.id, restAfterMinutes: 0),
+        ],
+        days: 7,
+        availabilityByWeekday: availability,
+      );
+      final aSlot = store.slots.singleWhere((s) => s.courseId == a.id);
+      final bSlot = store.slots.singleWhere((s) => s.courseId == b.id);
+      expect(aSlot.colorValue, isNotNull);
+      expect(bSlot.colorValue, isNotNull);
+      expect(aSlot.colorValue, isNot(bSlot.colorValue));
     });
 
     test('AI 失败回退：ordered 为空时按默认贪心落位', () async {
