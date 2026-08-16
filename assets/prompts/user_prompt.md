@@ -17,6 +17,7 @@
 - **时间偏好**:{{time_preference}}
 - **单次不可用时段**:{{one_off_blocks}}(不可排课)
 - **备注**:{{notes}}
+{{occupied_events_section}}
 
 ## 要求
 

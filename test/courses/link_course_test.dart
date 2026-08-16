@@ -49,6 +49,9 @@ void main() {
         ],
         days: 7,
         availabilityByWeekday: availability,
+        // 从固定日期(明天)开始,避免真实时间影响(现在时间不同会导致今天窗口不足)。
+        startFromNow: false,
+        anchorDate: DateTime(2026, 1, 6),
       );
       expect(result.failures, isEmpty);
       expect(result.placements, hasLength(2));

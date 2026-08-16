@@ -82,14 +82,14 @@ enum StudyIntensity {
       .firstWhere((i) => i.name == value, orElse: () => StudyIntensity.medium);
 }
 
-/// 排课开始时间：从现在开始（今天剩余时段）或从明天开始。
+/// 排课开始时间：从现在开始（今天剩余时段）或从指定日期开始。
 enum ScheduleStartMode {
   now,
-  tomorrow;
+  onDate;
 
   String get name => switch (this) {
     ScheduleStartMode.now => 'now',
-    ScheduleStartMode.tomorrow => 'tomorrow',
+    ScheduleStartMode.onDate => 'onDate',
   };
 
   static ScheduleStartMode fromName(String? value) => ScheduleStartMode.values
@@ -104,13 +104,15 @@ class AiSchedulePrefs {
     this.notes = '',
     this.timePreference = '',
     this.startMode = ScheduleStartMode.now,
+    this.startDate,
   });
 
   final StudyIntensity intensity;
   final int days; // 计划几天学完
   final String notes; // 备注：这段时间哪些时间已有安排
   final String timePreference; // 倾向的学习时间段；空 = 全天
-  final ScheduleStartMode startMode; // 从现在开始 / 从明天开始
+  final ScheduleStartMode startMode; // 从现在开始 / 从指定日期开始
+  final DateTime? startDate; // startMode == onDate 时的起始日期（仅日期部分）
 
   Map<String, dynamic> toJson() => {
     'intensity': intensity.name,
@@ -118,16 +120,29 @@ class AiSchedulePrefs {
     'notes': notes,
     'timePreference': timePreference,
     'startMode': startMode.name,
+    'startDate': startDate?.toIso8601String(),
   };
 
-  factory AiSchedulePrefs.fromJson(Map<String, dynamic> json) =>
-      AiSchedulePrefs(
-        intensity: StudyIntensity.fromName(json['intensity'] as String?),
-        days: (json['days'] as num?)?.toInt() ?? 7,
-        notes: json['notes'] as String? ?? '',
-        timePreference: json['timePreference'] as String? ?? '',
-        startMode: ScheduleStartMode.fromName(json['startMode'] as String?),
-      );
+  factory AiSchedulePrefs.fromJson(Map<String, dynamic> json) {
+    // 兼容旧数据：tomorrow → onDate（明天）。
+    final rawMode = json['startMode'] as String?;
+    final mode = rawMode == 'tomorrow'
+        ? ScheduleStartMode.onDate
+        : ScheduleStartMode.fromName(rawMode);
+    final rawDate = json['startDate'] as String?;
+    return AiSchedulePrefs(
+      intensity: StudyIntensity.fromName(json['intensity'] as String?),
+      days: (json['days'] as num?)?.toInt() ?? 7,
+      notes: json['notes'] as String? ?? '',
+      timePreference: json['timePreference'] as String? ?? '',
+      startMode: mode,
+      startDate: rawDate == null
+          ? (mode == ScheduleStartMode.onDate
+                ? DateTime.now().add(const Duration(days: 1))
+                : null)
+          : DateTime.tryParse(rawDate),
+    );
+  }
 }
 
 /// 从备注文本中解析学习时段与不可用时段（分钟）。
@@ -318,6 +333,7 @@ class AiScheduler {
     required AiScheduleConfig config,
     required String localeCode,
     AiSkillPackage? skillPackage,
+    String occupiedEvents = '',
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
     void Function(List<Map<String, String>> messages)? onMessages,
@@ -345,6 +361,7 @@ class AiScheduler {
       config: config,
       localeCode: localeCode,
       skillPackage: skillPackage,
+      occupiedEvents: occupiedEvents,
     );
     onMessages?.call(messages);
     final request = http.Request('POST', uri)
@@ -622,6 +639,7 @@ class AiScheduler {
     required AiScheduleConfig config,
     required String localeCode,
     AiSkillPackage? skillPackage,
+    String occupiedEvents = '',
   }) {
     if (skillPackage != null) {
       final schemeContent = [
@@ -642,6 +660,7 @@ class AiScheduler {
             prefs: prefs,
             window: config.windowDescription,
             localeCode: localeCode,
+            occupiedEvents: occupiedEvents,
           ),
         },
       ];
@@ -669,6 +688,7 @@ class AiScheduler {
     required AiSchedulePrefs prefs,
     required String window,
     required String localeCode,
+    String occupiedEvents = '',
   }) {
     final intensityLabel = switch (prefs.intensity) {
       StudyIntensity.relaxed => '轻松',
@@ -680,14 +700,18 @@ class AiScheduler {
       StudyIntensity.medium => 'medium',
       StudyIntensity.stressed => 'high',
     };
-    final startLabel = prefs.startMode == ScheduleStartMode.now ? '现在' : '明天';
+    final startLabel = prefs.startMode == ScheduleStartMode.now
+        ? '现在'
+        : (prefs.startDate == null
+              ? '明天'
+              : '${prefs.startDate!.year}-${prefs.startDate!.month.toString().padLeft(2, '0')}-${prefs.startDate!.day.toString().padLeft(2, '0')}');
     final rows = [
       for (final c in courses)
         '| ${c.id} | ${c.title} | ${c.durationMinutes} |',
     ].join('\n');
     // 从时间窗描述推导固定休息段（如 "08:00-12:00 与 13:00-23:00" → "12:00-13:00"）。
     final fixedBreaks = _fixedBreakFromWindow(window);
-    return template
+    var filled = template
         .replaceAll('{{course_count}}', '${courses.length}')
         .replaceAll('{{course_rows}}', rows)
         .replaceAll('{{intensity_label}}', intensityLabel)
@@ -710,6 +734,11 @@ class AiScheduler {
           '{{notes}}',
           prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim(),
         );
+    // 追加用户已排日程（防止课程与日程时间冲突）。
+    final occupiedSection = occupiedEvents.trim().isEmpty
+        ? ''
+        : '\n\n## 用户已有日程(不可排课,必须避开)\n$occupiedEvents';
+    return filled.replaceAll('{{occupied_events_section}}', occupiedSection);
   }
 
   /// 从时间窗描述提取相邻时段之间的休息段；无法解析时返回"无"。

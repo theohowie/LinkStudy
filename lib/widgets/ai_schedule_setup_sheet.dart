@@ -38,9 +38,9 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   StudyIntensity _intensity = StudyIntensity.medium;
   int _days = 7;
   ScheduleStartMode _startMode = ScheduleStartMode.now;
+  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   bool _scheduling = false;
   final TextEditingController _notes = TextEditingController();
-  final TextEditingController _timePreference = TextEditingController();
 
   @override
   void initState() {
@@ -51,7 +51,6 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   @override
   void dispose() {
     _notes.dispose();
-    _timePreference.dispose();
     super.dispose();
   }
 
@@ -62,9 +61,29 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       _intensity = saved.intensity;
       _days = saved.days.clamp(1, 14);
       _notes.text = saved.notes;
-      _timePreference.text = saved.timePreference;
       _startMode = saved.startMode;
+      if (saved.startDate != null) {
+        _startDate = saved.startDate!;
+      }
     });
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _startDate = picked);
+    }
+  }
+
+  String get _startDateLabel {
+    final d = _startDate;
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
+        ' ${const ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][d.weekday - 1]}';
   }
 
   String get _windowDescription {
@@ -78,14 +97,13 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   }
 
   /// 本次排课的实际可用时段：
-  /// 1. 若备注或时间偏好中解析出了学习时段 → 用学习时段减去不可用时段构建（用户输入优先，覆盖通用设置）；
+  /// 1. 若备注中解析出了学习时段 → 用学习时段减去不可用时段构建（用户备注优先，覆盖通用设置）；
   /// 2. 否则回退通用显示设置（开始/午休/结束时间窗）。
   List<List<AvailabilitySlot>> _effectiveAvailability() {
     final provider = widget.provider;
     final parsedNotes = parseNotesTimeRanges(_notes.text.trim());
-    final parsedPrefs = parseNotesTimeRanges(_timePreference.text.trim());
-    final learning = [...parsedNotes.learning, ...parsedPrefs.learning];
-    final blocked = [...parsedNotes.blocked, ...parsedPrefs.blocked];
+    final learning = [...parsedNotes.learning];
+    final blocked = [...parsedNotes.blocked];
     if (learning.isNotEmpty) {
       final slots = _subtractBlocked(learning, blocked);
       return List.generate(
@@ -151,6 +169,34 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// 收集排课窗口内用户已排的日程（不含 LinkStudy 课程自身），格式化为文本给 AI 避开。
+  String _occupiedEventsText() {
+    final provider = widget.provider;
+    final anchor = _startMode == ScheduleStartMode.now
+        ? DateTime.now()
+        : (_startDate);
+    final start = DateTime(anchor.year, anchor.month, anchor.day);
+    final end = start.add(Duration(days: _days.clamp(1, 30)));
+    final occurrences = provider.generalOccurrencesForRange(
+      startInclusive: start,
+      endExclusive: end,
+    );
+    if (occurrences.isEmpty) return '';
+    final lines = <String>[];
+    for (final o in occurrences) {
+      if (o.isAllDay) {
+        lines.add('${o.start.month}月${o.start.day}日 全天:${o.event.title}');
+        continue;
+      }
+      final hhmm = (DateTime d) =>
+          '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+      lines.add(
+        '${o.start.month}月${o.start.day}日 ${hhmm(o.start)}-${hhmm(o.end)}:${o.event.title}',
+      );
+    }
+    return lines.join('\n');
+  }
+
   Future<void> _run() async {
     if (_scheduling) return;
     if (AiScheduleRunner.instance.isRunning) {
@@ -162,10 +208,11 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       intensity: _intensity,
       days: _days,
       notes: _notes.text.trim(),
-      timePreference: _timePreference.text.trim(),
       startMode: _startMode,
+      startDate: _startMode == ScheduleStartMode.onDate ? _startDate : null,
     );
     final availability = _effectiveAvailability();
+    final occupiedEvents = _occupiedEventsText();
     // 后台静默排课：弹窗切换为"排课中"状态（不关闭），可查看进度或主动退出，后台继续执行。
     unawaited(
       AiScheduleRunner.instance.start(
@@ -174,6 +221,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
         availability: availability,
         windowDescription: _windowDescription,
         localeCode: provider.localeCode,
+        occupiedEvents: occupiedEvents,
       ),
     );
     if (mounted) {
@@ -270,16 +318,24 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
                       label: Text('从现在开始'),
                     ),
                     ButtonSegment(
-                      value: ScheduleStartMode.tomorrow,
+                      value: ScheduleStartMode.onDate,
                       icon: Icon(Icons.event_available_outlined),
-                      label: Text('从明天开始'),
+                      label: Text('选择日期开始'),
                     ),
                   ],
                   selected: {_startMode},
                   onSelectionChanged: (selection) =>
                       setState(() => _startMode = selection.first),
                 ),
-                const SizedBox(height: 8),
+                if (_startMode == ScheduleStartMode.onDate) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickStartDate,
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text('起始日期：$_startDateLabel'),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 Text('备注（可选）', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 8),
                 TextField(
@@ -289,18 +345,6 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
                   minLines: 1,
                   decoration: const InputDecoration(
                     hintText: '这几天哪些时间已有安排？如：周一下午有课、周三晚上有会…',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('时间偏好（可选，留空=全天）', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _timePreference,
-                  enabled: true,
-                  decoration: const InputDecoration(
-                    hintText: '如：晚上 19:00-22:00、每天上午',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),

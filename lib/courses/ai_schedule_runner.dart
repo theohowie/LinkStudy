@@ -27,6 +27,7 @@ class AiScheduleTask {
     required this.availability,
     required this.windowDescription,
     required this.localeCode,
+    this.occupiedEvents = '',
   }) : startedAt = DateTime.now();
 
   final String id;
@@ -35,6 +36,10 @@ class AiScheduleTask {
   final List<List<AvailabilitySlot>> availability;
   final String windowDescription;
   final String localeCode;
+
+  /// 排课窗口内用户已排日程的文本描述（防止课程与日程时间冲突）。
+  final String occupiedEvents;
+
   final DateTime startedAt;
 
   AiSchedulePhase phase = AiSchedulePhase.requestingAi;
@@ -99,6 +104,7 @@ class AiScheduleRunner extends ChangeNotifier {
     required List<List<AvailabilitySlot>> availability,
     required String windowDescription,
     required String localeCode,
+    String occupiedEvents = '',
     AiScheduler? scheduler,
     LinkCourseStore? store,
     AiScheduleSettings? settings,
@@ -118,6 +124,7 @@ class AiScheduleRunner extends ChangeNotifier {
       availability: availability,
       windowDescription: windowDescription,
       localeCode: localeCode,
+      occupiedEvents: occupiedEvents,
     );
     notifyListeners();
 
@@ -164,6 +171,7 @@ class AiScheduleRunner extends ChangeNotifier {
         config: requestConfig,
         localeCode: localeCode,
         skillPackage: skillPackage,
+        occupiedEvents: task.occupiedEvents,
         onMessages: (messages) {
           task.sentMessages = messages;
           notifyListeners();
@@ -200,6 +208,7 @@ class AiScheduleRunner extends ChangeNotifier {
             days: prefs.days,
             availabilityByWeekday: task.availability,
             startFromNow: prefs.startMode == ScheduleStartMode.now,
+            anchorDate: prefs.startDate,
             courseColors: value.colors,
             aiPlacements: value.placements,
           );

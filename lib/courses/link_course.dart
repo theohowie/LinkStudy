@@ -283,7 +283,8 @@ class LinkCourseStore extends ChangeNotifier {
   /// 按 AI 顺序排课：对 [courseIds]（本次勾选的课程）移除旧槽位，
   /// 按 [ordered]（可为空=默认贪心顺序）在 [days] 天窗口内落位；
   /// [availabilityByWeekday] 为每天可用时段（来自通用显示设置）。
-  /// [startFromNow] true=从现在开始（裁剪今天已过时段）；false=从明天开始（今天不排）。
+  /// [startFromNow] true=从现在开始（裁剪今天已过时段）；false=从指定日期开始（今天不排）。
+  /// [anchorDate] 可选：排课起始日锚点（startFromNow=false 时使用；null 则默认明天）。
   /// [courseColors] 每门课在网格展示的颜色（courseId → ARGB，来自 AI 建议）。
   /// [aiPlacements] AI 给出的具体时间安排（技能文件包输出契约）：
   /// 优先采用（校验在窗口内、时长匹配、不重叠）；校验失败的课程回退本地贪心落位。
@@ -293,6 +294,7 @@ class LinkCourseStore extends ChangeNotifier {
     required int days,
     required List<List<AvailabilitySlot>> availabilityByWeekday,
     bool startFromNow = true,
+    DateTime? anchorDate,
     Map<String, int>? courseColors,
     List<AiPlacement> aiPlacements = const [],
   }) async {
@@ -307,7 +309,7 @@ class LinkCourseStore extends ChangeNotifier {
     }
     final today = startFromNow
         ? DateTime.now()
-        : DateTime.now().add(const Duration(days: 1));
+        : (anchorDate ?? DateTime.now().add(const Duration(days: 1)));
 
     final placements = <SchedulePlacement>[];
     final failures = <({String courseId, String reason})>[];

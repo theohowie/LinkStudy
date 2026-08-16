@@ -105,7 +105,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: l10n.addEvent,
+            tooltip: l10n.addCourse,
             onPressed: _editorSheetOpen
                 ? null
                 : () => _openEditor(context, provider),
@@ -550,7 +550,10 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
         builder: (sheetContext) =>
             CoursePendingSheet(store: LinkCourseStore.instance),
       );
-      if (selected == null || selected.isEmpty || !mounted || !context.mounted) {
+      if (selected == null ||
+          selected.isEmpty ||
+          !mounted ||
+          !context.mounted) {
         return;
       }
       await showAppModalSheet<void>(

@@ -502,10 +502,30 @@ void main() {
       expect(prefs.startMode, ScheduleStartMode.now);
       final loaded = AiSchedulePrefs.fromJson(prefs.toJson());
       expect(loaded.startMode, ScheduleStartMode.now);
-      const tomorrow = AiSchedulePrefs(startMode: ScheduleStartMode.tomorrow);
+      // onDate 模式 + startDate。
+      final onDate = AiSchedulePrefs(
+        startMode: ScheduleStartMode.onDate,
+        startDate: DateTime(2026, 3, 15),
+      );
+      final loadedOnDate = AiSchedulePrefs.fromJson(onDate.toJson());
+      expect(loadedOnDate.startMode, ScheduleStartMode.onDate);
+      expect(loadedOnDate.startDate, DateTime(2026, 3, 15));
+    });
+
+    test('旧数据 tomorrow 兼容映射为 onDate(明天)', () {
+      final loaded = AiSchedulePrefs.fromJson({
+        'intensity': 'medium',
+        'days': 3,
+        'notes': '',
+        'timePreference': '',
+        'startMode': 'tomorrow',
+      });
+      expect(loaded.startMode, ScheduleStartMode.onDate);
+      expect(loaded.startDate, isNotNull);
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
       expect(
-        AiSchedulePrefs.fromJson(tomorrow.toJson()).startMode,
-        ScheduleStartMode.tomorrow,
+        loaded.startDate!.difference(tomorrow).inDays.abs(),
+        lessThanOrEqualTo(1),
       );
     });
 
