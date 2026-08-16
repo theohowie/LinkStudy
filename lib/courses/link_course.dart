@@ -79,6 +79,7 @@ class ScheduleSlot {
   final int weekday; // 1=周一 … 7=周日
   final int startMinute;
   final int endMinute;
+  final int? colorValue; // 课程在网格展示的颜色（ARGB，来自 AI 建议或本地分配）。
 
   const ScheduleSlot({
     required this.courseId,
@@ -86,6 +87,7 @@ class ScheduleSlot {
     required this.weekday,
     required this.startMinute,
     required this.endMinute,
+    this.colorValue,
   });
 
   Map<String, dynamic> toJson() => {
@@ -94,6 +96,7 @@ class ScheduleSlot {
         'weekday': weekday,
         'startMinute': startMinute,
         'endMinute': endMinute,
+        'color': colorValue,
       };
 
   factory ScheduleSlot.fromJson(Map<String, dynamic> json) => ScheduleSlot(
@@ -102,6 +105,7 @@ class ScheduleSlot {
         weekday: (json['weekday'] as num).toInt(),
         startMinute: (json['startMinute'] as num).toInt(),
         endMinute: (json['endMinute'] as num).toInt(),
+        colorValue: (json['color'] as num?)?.toInt(),
       );
 }
 
@@ -259,12 +263,14 @@ class LinkCourseStore extends ChangeNotifier {
   /// 按 [ordered]（可为空=默认贪心顺序）在 [days] 天窗口内落位；
   /// [availabilityByWeekday] 为每天可用时段（来自通用显示设置）。
   /// [startFromNow] true=从现在开始（裁剪今天已过时段）；false=从明天开始（今天不排）。
+  /// [courseColors] 每门课在网格展示的颜色（courseId → ARGB，来自 AI 建议）。
   Future<SchedulingResult> scheduleWithOrder({
     required List<String> courseIds,
     required List<OrderedCourse> ordered,
     required int days,
     required List<List<AvailabilitySlot>> availabilityByWeekday,
     bool startFromNow = true,
+    Map<String, int>? courseColors,
   }) async {
     final ids = courseIds.toSet();
     final pending = _courses.where((c) => ids.contains(c.id)).toList();
@@ -295,6 +301,7 @@ class LinkCourseStore extends ChangeNotifier {
           weekday: p.weekday,
           startMinute: p.start,
           endMinute: p.end,
+          colorValue: courseColors?[p.courseId],
         ),
     ];
     _slots = [..._slots, ...added];

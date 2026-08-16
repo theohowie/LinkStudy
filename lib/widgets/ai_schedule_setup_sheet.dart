@@ -6,6 +6,7 @@ import '../courses/ai_schedule_runner.dart';
 import '../courses/ai_scheduler.dart';
 import '../courses/link_course.dart';
 import '../providers/timetable_provider.dart';
+import 'ai_schedule_progress_sheet.dart';
 import 'app_modal_sheet.dart';
 
 /// AI 排课设置弹窗：学习强度 / 计划天数 / 备注（已有安排）/ 时间偏好。
@@ -36,6 +37,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   StudyIntensity _intensity = StudyIntensity.medium;
   int _days = 7;
   ScheduleStartMode _startMode = ScheduleStartMode.now;
+  bool _scheduling = false;
   final TextEditingController _notes = TextEditingController();
   final TextEditingController _timePreference = TextEditingController();
 
@@ -92,6 +94,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
   }
 
   Future<void> _run() async {
+    if (_scheduling) return;
     if (AiScheduleRunner.instance.isRunning) {
       _showSnack('已有排课任务进行中，请稍候');
       return;
@@ -110,7 +113,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       lunchEndMinute: provider.generalLunchEndMinute,
       endMinute: provider.generalDayEndMinute,
     );
-    // 后台静默排课：立即关闭弹窗，任务在后台执行，完成时发通知。
+    // 后台静默排课：弹窗切换为"排课中"状态（不关闭），可查看进度或主动退出，后台继续执行。
     unawaited(
       AiScheduleRunner.instance.start(
         courseIds: widget.courseIds,
@@ -121,30 +124,55 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       ),
     );
     if (mounted) {
-      _showSnack('已开始后台排课，完成时会通知你，可随时打开查看进度');
-      Navigator.of(context).pop();
+      setState(() => _scheduling = true);
+      _showSnack('已开始后台排课，完成时会通知你，可点"排课中…"查看进度或退出');
     }
+  }
+
+  Future<void> _openProgress() async {
+    await showAppModalSheet<void>(
+      context: context,
+      maxWidth: appSheetWidthMedium,
+      builder: (sheetContext) =>
+          AiScheduleProgressSheet(store: widget.store),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AppSheetScaffold(
+      heightFactor: 0.84,
       title: const Text('AI 智能排课'),
       subtitle: const Text('告诉 AI 你的学习节奏，剩下的交给它'),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(_scheduling ? '退出（后台继续）' : '取消'),
         ),
         FilledButton(
-          onPressed: _run,
-          child: const Text('开始 AI 排课'),
+          onPressed: _scheduling ? _openProgress : _run,
+          child: _scheduling
+              ? const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text('排课中…'),
+                  ],
+                )
+              : const Text('开始 AI 排课'),
         ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: AbsorbPointer(
+        absorbing: _scheduling,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Text('学习强度', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           SegmentedButton<StudyIntensity>(
@@ -236,7 +264,8 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

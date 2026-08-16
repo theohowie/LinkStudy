@@ -52,8 +52,31 @@ void main() {
       final aSlot = store.slots.singleWhere((s) => s.courseId == a.id);
       final bSlot = store.slots.singleWhere((s) => s.courseId == b.id);
       expect(aSlot.epochDay, isNotNull);
-      // a 之后有 20 分钟休息 → b 不紧贴 a。
-      expect(bSlot.startMinute, aSlot.endMinute + 20);
+      // a 之后有 20 分钟休息 → b 不紧贴 a（可能顺延到下一时段，故为"至少"）。
+      expect(bSlot.startMinute, greaterThanOrEqualTo(aSlot.endMinute + 20));
+      // 排序稳定：a 的排课位置不晚于 b。
+      final aKey = (aSlot.epochDay ?? 0) * 10000 + aSlot.startMinute;
+      final bKey = (bSlot.epochDay ?? 0) * 10000 + bSlot.startMinute;
+      expect(aKey, lessThanOrEqualTo(bKey));
+    });
+
+    test('scheduleWithOrder 携带课程颜色到槽位', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final a = await store.addCourse(
+        url: 'https://example.com/color-a',
+        title: '颜色课程',
+        durationMinutes: 40,
+      );
+      await store.scheduleWithOrder(
+        courseIds: [a.id],
+        ordered: [(courseId: a.id, restAfterMinutes: 0)],
+        days: 7,
+        availabilityByWeekday: availability,
+        startFromNow: false,
+        courseColors: {a.id: 0xFF4D6BFE},
+      );
+      expect(store.slots.single.colorValue, 0xFF4D6BFE);
     });
 
     test('AI 失败回退：ordered 为空时按默认贪心落位', () async {

@@ -588,18 +588,13 @@ class _PendingCoursesAction extends StatelessWidget {
         final running = runner.isRunning;
         final count = store.pendingCount;
         if (running) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-              ),
+          return IconButton(
+            tooltip: 'AI 排课中，点击查看进度',
+            onPressed: disabled ? null : onPressed,
+            icon: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
             ),
           );
         }

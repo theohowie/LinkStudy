@@ -88,6 +88,37 @@ void main() {
       expect(success.value.reason, '截止日期优先');
     });
 
+    test('解析课程颜色（#RRGGBB → ARGB）', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":5,'
+                      '"color":"#4D6BFE"},{"courseId":"b","restAfterMinutes":0}],'
+                      '"reason":"x"}',
+                },
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final outcome = await AiScheduler(client: client).schedule(
+        courses: [_course('a'), _course('b')],
+        prefs: prefs,
+        config: _config(),
+        localeCode: 'zh-CN',
+      );
+      final success = outcome as AiScheduleOutcomeSuccess;
+      expect(success.value.colors['a'], 0xFF4D6BFE);
+      // 未提供颜色的课程不在映射中。
+      expect(success.value.colors.containsKey('b'), isFalse);
+    });
+
     test('容错：markdown 代码块包裹与裸数组', () async {
       final client = MockClient((request) async {
         return http.Response(

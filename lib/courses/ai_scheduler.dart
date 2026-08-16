@@ -138,12 +138,19 @@ class AiSchedulePrefs {
       );
 }
 
-/// AI 排课结果（成功：顺序 + 休息 + 思路说明）。
+/// AI 排课结果（成功：顺序 + 休息 + 每门课颜色 + 思路说明）。
 class AiScheduleSuccess {
-  const AiScheduleSuccess({required this.ordered, required this.reason});
+  const AiScheduleSuccess({
+    required this.ordered,
+    required this.reason,
+    this.colors = const {},
+  });
 
   final List<OrderedCourse> ordered;
   final String reason;
+
+  /// 每门课的建议颜色（courseId → ARGB 颜色值，来自 AI 输出的 #RRGGBB）。
+  final Map<String, int> colors;
 }
 
 /// AI 排课失败类型。
@@ -180,7 +187,7 @@ class AiScheduleOutcomeError extends AiScheduleOutcome {
 /// 内置"排课 Skill"（system prompt）：AI 的排课方法论与输出契约。
 /// 刻意精简以减小请求体（MTU 黑洞环境下大请求会被丢弃）。
 const aiScheduleSystemPrompt = '''
-你是排课规划助手。规则：1)截止日近、优先级高者先排；2)按计划天数均摊每日；3)同日多课间按强度休息（轻松20-40/中等10-20/压力5-10分钟，课长休息久）；4)贴合偏好时间，备注中已有安排的时间绝不排课；5)只能在时间窗内排课；6)休息可为0。只输出JSON：{"order":[{"courseId":"id","restAfterMinutes":N}],"reason":"一句话"}，order含全部课程各一次。
+你是排课规划助手。规则：1)截止日近、优先级高者先排；2)按计划天数均摊每日；3)同日多课间按强度休息（轻松20-40/中等10-20/压力5-10分钟，课长休息久）；4)贴合偏好时间，备注中已有安排的时间绝不排课；5)只能在时间窗内排课；6)休息可为0。每门课给一个与其他课程不同的颜色（#RRGGBB，如#4D6BFE），相邻课程避免同色。只输出JSON：{"order":[{"courseId":"id","restAfterMinutes":N,"color":"#RRGGBB"}],"reason":"一句话"}，order含全部课程各一次。
 ''';
 
 /// AI 排课客户端：组装 Prompt → 调用 OpenAI 兼容接口 → 解析固定格式。
@@ -440,6 +447,7 @@ class AiScheduler {
         return null;
       }
       final ordered = <OrderedCourse>[];
+      final colors = <String, int>{};
       for (final item in rawItems) {
         if (item is! Map) continue;
         final courseId = item['courseId'];
@@ -447,13 +455,36 @@ class AiScheduler {
         final restRaw = item['restAfterMinutes'];
         final rest = restRaw is num ? restRaw.toInt() : 0;
         ordered.add((courseId: courseId.trim(), restAfterMinutes: rest < 0 ? 0 : rest));
+        final color = _parseColor(item['color']);
+        if (color != null) {
+          colors[courseId.trim()] = color;
+        }
       }
       // JSON 结构合法但没有任何有效课程 → 返回空列表，由调用方判定 empty。
-      return AiScheduleSuccess(ordered: ordered, reason: reason.trim());
+      return AiScheduleSuccess(
+        ordered: ordered,
+        reason: reason.trim(),
+        colors: colors,
+      );
     } catch (e) {
       debugPrint('[ai_scheduler] content parse failed: $e');
       return null;
     }
+  }
+
+  /// 解析颜色：#RRGGBB / #AARRGGBB → ARGB int；数字直接取整；失败返回 null。
+  static int? _parseColor(Object? raw) {
+    if (raw is num) return raw.toInt();
+    if (raw is! String) return null;
+    var hex = raw.trim().replaceFirst('#', '');
+    if (hex.length == 6) {
+      final v = int.tryParse(hex, radix: 16);
+      return v == null ? null : (0xFF000000 | v);
+    }
+    if (hex.length == 8) {
+      return int.tryParse(hex, radix: 16);
+    }
+    return null;
   }
 
   static String _trimBody(String body) {

@@ -107,5 +107,7 @@ GeneralEvent buildGridEvent(
     title: course.title,
     startDateTimeIso: start.toIso8601String(),
     endDateTimeIso: end.toIso8601String(),
+    // 课程颜色（AI 建议）在网格展示时使用。
+    colorValue: slot.colorValue,
   );
 }

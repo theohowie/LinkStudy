@@ -85,6 +85,7 @@ class AiScheduleProgressSheet extends StatelessWidget {
         final task = AiScheduleRunner.instance.task;
         if (task == null || task.phase == AiSchedulePhase.idle) {
           return const AppSheetScaffold(
+            heightFactor: 0.84,
             title: Text('AI 排课'),
             subtitle: Text('暂无排课任务'),
             actions: [],
@@ -117,6 +118,7 @@ class AiScheduleProgressSheet extends StatelessWidget {
         }
 
         return AppSheetScaffold(
+          heightFactor: 0.84,
           title: const Text('AI 排课'),
           subtitle: Text(
             done || failed

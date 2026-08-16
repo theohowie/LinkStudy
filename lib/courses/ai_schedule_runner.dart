@@ -161,6 +161,7 @@ class AiScheduleRunner extends ChangeNotifier {
             days: prefs.days,
             availabilityByWeekday: task.availability,
             startFromNow: prefs.startMode == ScheduleStartMode.now,
+            courseColors: value.colors,
           );
           task.placedCount = result.placements.length;
           task.failureCount = result.failures.length;

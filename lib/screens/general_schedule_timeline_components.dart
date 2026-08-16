@@ -306,9 +306,28 @@ class _OccurrenceCard extends StatelessWidget {
                 );
 
                 if (dense || narrow || !title.showDetails) {
+                  // 窄屏/紧凑也显示开始-结束时间（用户要求课程格子带时间）；
+                  // 整体 FittedBox 缩放，格子高度不足时自动缩小，避免溢出。
                   return Align(
                     alignment: AlignmentDirectional.topStart,
-                    child: titleWidget,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.topStart,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          titleWidget,
+                          if (narrow || !dense)
+                            Text(
+                              _formatOccurrenceTime(context, occurrence),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: detailStyle,
+                            ),
+                        ],
+                      ),
+                    ),
                   );
                 }
 
