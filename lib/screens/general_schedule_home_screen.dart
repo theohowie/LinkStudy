@@ -595,7 +595,14 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
       (s) => s.startMinute == draggedStart && s.endMinute == draggedEnd,
     );
     if (anchorIndex < 0) anchorIndex = 0;
+    final anchor = slots[anchorIndex.clamp(0, slots.length - 1)];
+    final anchorDay = anchor.epochDay ?? 0;
     final day = DateTime(targetDay.year, targetDay.month, targetDay.day);
+    final targetEpochDay = epochDayOf(day);
+    // 无实际变化（时间与日期都未变）时跳过，避免"恢复原位"的无效重写。
+    if (targetEpochDay == anchorDay && startMinute == anchor.startMinute) {
+      return;
+    }
     // 移动前快照该课程槽位（用于撤销）。
     _undoStack.add({
       courseId: [
@@ -615,7 +622,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     unawaited(
       store.moveSlot(
         courseId,
-        epochDay: epochDayOf(day),
+        epochDay: targetEpochDay,
         weekday: day.weekday,
         startMinute: startMinute,
         anchorSlotIndex: anchorIndex,

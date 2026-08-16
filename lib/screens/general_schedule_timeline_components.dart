@@ -477,9 +477,8 @@ class _DraggableOccurrenceCardState extends State<_DraggableOccurrenceCard> {
       onLongPressEnd: (details) {
         if (!_dragging) return;
         final rawMinutes = (_dragOffset.dy / widget.minuteHeight).round();
-        // 吸附到网格粒度。
-        final snapped = (rawMinutes ~/ 10) * 10;
-        final deltaMinutes = snapped;
+        // 按 1 分钟精确跟随，避免小距离拖动被吸附回原位。
+        final deltaMinutes = rawMinutes;
         final newStart = (_originalStartMinute + deltaMinutes)
             .clamp(widget.startMinutes, widget.endMinutes - 15);
         // 跨天：每超过一个 dayWidth 算一天。
