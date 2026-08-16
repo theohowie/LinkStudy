@@ -265,6 +265,13 @@ class _DayCalendarViewState extends State<_DayCalendarView> {
   late int _currentDayPage;
   late int _currentWeekPage;
   bool _syncingWeekPickerFromDay = false;
+  double _scale = 1.0;
+
+  /// 时间刻度单位（分钟/格）：基准为设置的"时间精度"，双指缩放时按比例变化。
+  int get _unitMinutes =>
+      (widget.provider.generalTimelineUnitMinutes / _scale)
+          .round()
+          .clamp(5, 8 * 60);
 
   @override
   void initState() {
@@ -478,22 +485,35 @@ class _DayCalendarViewState extends State<_DayCalendarView> {
           onDaySelected: widget.onDaySelected,
         ),
         Expanded(
-          child: PageView.builder(
-            key: _generalDayPagerKey,
-            controller: _dayController,
-            onPageChanged: _handleDayPageChanged,
-            itemBuilder: (context, index) {
-              final pageDay = _dayForPage(index);
-              return _DayTimelinePage(
-                date: pageDay,
-                provider: widget.provider,
-                filter: widget.filter,
-                onEmptySlotTap: widget.onEmptySlotTap,
-                onOccurrenceTap: widget.onOccurrenceTap,
-                onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
-                onMoveCourse: widget.onMoveCourse,
-              );
+          // 双指缩放：与周视图一致，调整时间刻度。
+          child: GestureDetector(
+            onScaleStart: (_) {},
+            onScaleUpdate: (details) {
+              if (details.pointerCount < 2) return;
+              final base = widget.provider.generalTimelineUnitMinutes;
+              final next = (_scale * details.scale).clamp(base / 480, base / 5);
+              if ((next - _scale).abs() > 0.01) {
+                setState(() => _scale = next);
+              }
             },
+            child: PageView.builder(
+              key: _generalDayPagerKey,
+              controller: _dayController,
+              onPageChanged: _handleDayPageChanged,
+              itemBuilder: (context, index) {
+                final pageDay = _dayForPage(index);
+                return _DayTimelinePage(
+                  date: pageDay,
+                  provider: widget.provider,
+                  filter: widget.filter,
+                  onEmptySlotTap: widget.onEmptySlotTap,
+                  onOccurrenceTap: widget.onOccurrenceTap,
+                  onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
+                  onMoveCourse: widget.onMoveCourse,
+                  unitMinutes: _unitMinutes,
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -510,6 +530,7 @@ class _DayTimelinePage extends StatelessWidget {
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
     this.onMoveCourse,
+    this.unitMinutes = 60,
   });
 
   final DateTime date;
@@ -524,6 +545,7 @@ class _DayTimelinePage extends StatelessWidget {
     int startMinute,
     int deltaMinutes,
   )? onMoveCourse;
+  final int unitMinutes;
 
   @override
   Widget build(BuildContext context) {
@@ -546,6 +568,7 @@ class _DayTimelinePage extends StatelessWidget {
       onOccurrenceTap: onOccurrenceTap,
       onMoreOccurrencesTap: onMoreOccurrencesTap,
       onMoveCourse: onMoveCourse,
+      unitMinutes: unitMinutes,
     );
   }
 }

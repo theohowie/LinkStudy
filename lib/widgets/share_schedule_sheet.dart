@@ -128,19 +128,18 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
       _toast('$_rangeLabel为空，没有可分享的内容');
       return;
     }
-    // 渲染精美海报 → 截图 → 存临时文件 → 分享图片。
+    // 渲染精美课程表海报 → 截图 → 存临时文件 → 分享图片。
     final boundaryKey = GlobalKey();
     final poster = RepaintBoundary(
       key: boundaryKey,
       child: _SchedulePoster(rangeLabel: _rangeLabel, occurrences: list),
     );
-    // 先挂载到 Overlay 渲染一帧再截图。
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(builder: (_) => poster);
     overlay.insert(entry);
     try {
       await WidgetsBinding.instance.endOfFrame;
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 80));
       final boundary =
           boundaryKey.currentContext!.findRenderObject()!
               as RenderRepaintBoundary;
@@ -319,7 +318,8 @@ class _FormatChip extends StatelessWidget {
   }
 }
 
-/// 精美日程海报（图片分享渲染用）。
+/// 课程表格式日程海报（图片分享渲染用）：左侧时间刻度 × 顶部星期/日期，
+/// 课程块按时间绝对定位在网格内，形如纸质课程表。
 class _SchedulePoster extends StatelessWidget {
   const _SchedulePoster({required this.rangeLabel, required this.occurrences});
 
@@ -335,6 +335,10 @@ class _SchedulePoster extends StatelessWidget {
     Color(0xFFE64980),
   ];
 
+  // 课程表时间范围：6:00 - 23:00。
+  static const _minMinute = 6 * 60;
+  static const _maxMinute = 23 * 60;
+
   @override
   Widget build(BuildContext context) {
     // 按日期分组。
@@ -345,11 +349,18 @@ class _SchedulePoster extends StatelessWidget {
     }
     final days = byDay.keys.toList()..sort();
     final total = occurrences.length;
+    // 网格参数：时间刻度高 46px/小时，列宽 150px。
+    const hourHeight = 46.0;
+    const timeColWidth = 56.0;
+    const dayColWidth = 150.0;
+    final gridHeight = (_maxMinute - _minMinute) / 60.0 * hourHeight;
+    const headerHeight = 44.0;
+    final tableWidth = timeColWidth + dayColWidth * days.length;
 
     return Material(
       color: const Color(0xFFF6F7FB),
       child: Container(
-        width: 720,
+        width: tableWidth + 56,
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -357,44 +368,255 @@ class _SchedulePoster extends StatelessWidget {
           children: [
             // 顶部渐变标题。
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
+              width: tableWidth,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF4D6BFE), Color(0xFF7C5CFF)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    '📅 $rangeLabel',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '📅 $rangeLabel',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '共 $total 条日程 · LinkStudy',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '共 $total 条日程 · LinkStudy',
-                    style: const TextStyle(color: Colors.white70, fontSize: 15),
+                  const Icon(
+                    Icons.menu_book_outlined,
+                    color: Colors.white70,
+                    size: 28,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            for (var i = 0; i < days.length; i++) ...[
-              _DaySection(
-                dayKey: days[i],
-                items: byDay[days[i]]!,
-                color: _colors[i % _colors.length],
+            const SizedBox(height: 16),
+            // 课程表：表头 + 网格。
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE3E6EF)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              if (i < days.length - 1) const SizedBox(height: 16),
-            ],
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  // 表头：星期 + 日期。
+                  SizedBox(
+                    height: headerHeight,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: timeColWidth,
+                          color: const Color(0xFFF0F2F8),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '时间',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ),
+                        for (final key in days)
+                          Container(
+                            width: dayColWidth,
+                            color: const Color(0xFFF0F2F8),
+                            alignment: Alignment.center,
+                            child: _DayHeaderLabel(key),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // 网格主体。
+                  SizedBox(
+                    width: tableWidth,
+                    height: gridHeight,
+                    child: Stack(
+                      children: [
+                        // 背景行线 + 时间刻度。
+                        for (var h = _minMinute; h <= _maxMinute; h += 60)
+                          Positioned(
+                            left: 0,
+                            top: (h - _minMinute) / 60.0 * hourHeight,
+                            right: 0,
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: timeColWidth,
+                                  height: hourHeight,
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFAFBFD),
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Color(0xFFE8EAF2),
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${(h ~/ 60).toString().padLeft(2, '0')}:00',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF9AA0AE),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                for (var d = 0; d < days.length; d++)
+                                  Container(
+                                    width: dayColWidth,
+                                    height: hourHeight,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        right: BorderSide(
+                                          color: Color(0xFFEDEFF5),
+                                        ),
+                                        bottom: BorderSide(
+                                          color: Color(0xFFEDEFF5),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        // 课程块（按时间绝对定位）。
+                        for (var d = 0; d < days.length; d++)
+                          for (final o in byDay[days[d]]!)
+                            _posterCourseBlock(
+                              occurrence: o,
+                              color: _colors[d % _colors.length],
+                              left: timeColWidth + d * dayColWidth,
+                              top:
+                                  (o.start.hour * 60 +
+                                      o.start.minute -
+                                      _minMinute) /
+                                  60.0 *
+                                  hourHeight,
+                              height:
+                                  o.end.difference(o.start).inMinutes /
+                                  60.0 *
+                                  hourHeight,
+                              width: dayColWidth,
+                            ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            // 图例。
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: [
+                for (var d = 0; d < days.length; d++)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _colors[d % _colors.length],
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        days[d].substring(5).replaceAll('-', '/'),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 单条课程块：卡片样式，标题 + 时间，超出裁剪。
+  Widget _posterCourseBlock({
+    required GeneralEventOccurrence occurrence,
+    required Color color,
+    required double left,
+    required double top,
+    required double height,
+    required double width,
+  }) {
+    return Positioned(
+      left: left + 3,
+      top: top + 2,
+      width: width - 6,
+      height: height - 4,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(left: BorderSide(color: color, width: 3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              occurrence.event.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
+            ),
+            Text(
+              '${_hhmm(occurrence.start)}-${_hhmm(occurrence.end)}',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF6B7280),
+                height: 1.2,
+              ),
+            ),
           ],
         ),
       ),
@@ -402,103 +624,37 @@ class _SchedulePoster extends StatelessWidget {
   }
 }
 
-class _DaySection extends StatelessWidget {
-  const _DaySection({
-    required this.dayKey,
-    required this.items,
-    required this.color,
-  });
+class _DayHeaderLabel extends StatelessWidget {
+  const _DayHeaderLabel(this.dayKey);
 
   final String dayKey;
-  final List<GeneralEventOccurrence> items;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final date = DateTime.tryParse(dayKey);
-    final weekday = date == null
-        ? ''
-        : const ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][date.weekday - 1];
-    final monthDay = date == null ? dayKey : '${date.month}月${date.day}日';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: color, width: 4)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    if (date == null) {
+      return Text(dayKey, style: const TextStyle(fontSize: 13));
+    }
+    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          weekdays[date.weekday - 1],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF2A2F3A),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '$monthDay $weekday',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${items.length} 条',
-                style: const TextStyle(color: Color(0xFF9AA0AE), fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          for (final o in items)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${_hhmm(o.start)}-${_hhmm(o.end)}',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      o.event.title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2A2F3A),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
+        ),
+        Text(
+          '${date.month}/${date.day}',
+          style: const TextStyle(fontSize: 11, color: Color(0xFF9AA0AE)),
+        ),
+      ],
     );
   }
-
-  static String _hhmm(DateTime d) =>
-      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
+
+String _hhmm(DateTime d) =>
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
