@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../courses/ai_schedule_runner.dart';
-import '../courses/ai_scheduler.dart';
 import '../courses/link_course.dart';
 import '../utils/time_utils.dart';
 import 'app_modal_sheet.dart';

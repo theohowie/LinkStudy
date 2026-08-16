@@ -296,7 +296,7 @@ void main() {
       const skillPackage = AiSkillPackage(
         systemPrompt: 'sys',
         userTemplate: '{{fixed_breaks}}|{{notes}}',
-        schemeFiles: const {},
+        schemeFiles: {},
       );
       await AiScheduler(client: client).schedule(
         courses: [_course('a')],

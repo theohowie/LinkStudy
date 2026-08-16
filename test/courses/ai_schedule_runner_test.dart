@@ -155,7 +155,6 @@ void main() {
   });
 
   test('markViewed 后 hasUnviewedResult 为 false', () async {
-    final store = LinkCourseStore.instance;
     final a = await addCourse('a');
 
     await AiScheduleRunner.instance.start(
