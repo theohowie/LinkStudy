@@ -205,6 +205,36 @@ void main() {
     expect(provider.generalSchedules, hasLength(2));
   });
 
+  testWidgets('calendar manager rename cancel does not crash', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final initialData = buildInitialAppData(localeCode: defaultLocaleCode);
+    final provider = await _createGeneralProvider(initialData);
+    await _pumpGeneralScheduleHomeScreen(tester, provider);
+
+    // 打开日历管理。
+    await tester.tap(find.byTooltip('Calendars'));
+    await tester.pumpAndSettle();
+
+    // 点第一个日历的重命名图标。
+    final renameButton = find.byTooltip('Rename');
+    expect(renameButton, findsWidgets);
+    await tester.tap(renameButton.first);
+    await tester.pumpAndSettle();
+
+    // 重命名对话框出现 → 点取消。
+    expect(find.text('Rename calendar'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // 不崩溃：日历管理 sheet 仍在、日历数量不变。
+    expect(find.byTooltip('Add calendar'), findsOneWidget);
+    expect(provider.generalSchedules, hasLength(1));
+  });
+
   testWidgets('calendar manager fits narrow phone width', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));

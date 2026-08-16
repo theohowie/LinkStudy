@@ -115,44 +115,24 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
   Future<void> _renameCalendar(GeneralSchedule schedule) async {
     await _runCalendarAction(() async {
       final provider = context.read<TimetableProvider>();
-      final controller = TextEditingController(text: schedule.name);
+      // controller 由对话框内部的 StatefulWidget 管理生命周期，
+      // 保证在对话框完全卸载(含退出动画)后才 dispose,避免
+      // "TextEditingController used after being disposed" 崩溃。
       final name = await showExpressiveDialog<String>(
         context: context,
         // 与日历管理 sheet 同一 Navigator,避免跨 Navigator 弹窗导致依赖清理时序错乱。
         useRootNavigator: false,
         builder: (dialogContext) {
           final l10n = AppLocalizations.of(dialogContext);
-          var popped = false;
-          void popWith(String? value) {
-            if (popped) return;
-            popped = true;
-            Navigator.of(dialogContext).pop(value);
-          }
-
-          return AlertDialog(
-            title: Text(l10n.renameCalendar),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: l10n.name,
-                prefixIcon: const Icon(Icons.edit_outlined),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => popWith(null),
-                child: Text(l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => popWith(controller.text.trim()),
-                child: Text(l10n.save),
-              ),
-            ],
+          return _RenameCalendarDialog(
+            initialName: schedule.name,
+            title: l10n.renameCalendar,
+            nameLabel: l10n.name,
+            cancelLabel: l10n.cancel,
+            saveLabel: l10n.save,
           );
         },
       );
-      controller.dispose();
       if (!mounted) return;
       if (name != null && name.trim().isNotEmpty) {
         await provider.renameGeneralSchedule(schedule.id, name);
@@ -200,6 +180,70 @@ class _CalendarManagerSheetState extends State<_CalendarManagerSheet> {
         await provider.deleteGeneralSchedule(schedule.id);
       }
     });
+  }
+}
+
+/// 重命名日历对话框：TextField 的 controller 生命周期绑定在对话框内，
+/// 保证对话框完全卸载(含退出动画)后才 dispose,避免提前 dispose 崩溃。
+class _RenameCalendarDialog extends StatefulWidget {
+  const _RenameCalendarDialog({
+    required this.initialName,
+    required this.title,
+    required this.nameLabel,
+    required this.cancelLabel,
+    required this.saveLabel,
+  });
+
+  final String initialName;
+  final String title;
+  final String nameLabel;
+  final String cancelLabel;
+  final String saveLabel;
+
+  @override
+  State<_RenameCalendarDialog> createState() => _RenameCalendarDialogState();
+}
+
+class _RenameCalendarDialogState extends State<_RenameCalendarDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialName);
+  var _popped = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _popWith(String? value) {
+    if (_popped) return;
+    _popped = true;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: widget.nameLabel,
+          prefixIcon: const Icon(Icons.edit_outlined),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => _popWith(null),
+          child: Text(widget.cancelLabel),
+        ),
+        FilledButton(
+          onPressed: () => _popWith(_controller.text.trim()),
+          child: Text(widget.saveLabel),
+        ),
+      ],
+    );
   }
 }
 
