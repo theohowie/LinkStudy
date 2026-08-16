@@ -243,7 +243,7 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
             OutlinedButton.icon(
               onPressed: _pickStartDate,
               icon: const Icon(Icons.calendar_month_outlined, size: 18),
-              label: Text('开始日期：$_dateLabel(_startDate)'),
+              label: Text('开始日期：${_dateLabel(_startDate)}'),
               style: OutlinedButton.styleFrom(
                 visualDensity: VisualDensity.compact,
               ),
