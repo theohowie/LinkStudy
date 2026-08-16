@@ -17,34 +17,30 @@ enum AiProvider {
   openai;
 
   String get name => switch (this) {
-        AiProvider.deepseek => 'deepseek',
-        AiProvider.openai => 'openai',
-      };
+    AiProvider.deepseek => 'deepseek',
+    AiProvider.openai => 'openai',
+  };
 
   static AiProvider fromName(String? value) => AiProvider.values.firstWhere(
-        (p) => p.name == value,
-        orElse: () => AiProvider.deepseek,
-      );
+    (p) => p.name == value,
+    orElse: () => AiProvider.deepseek,
+  );
 
   String get defaultBaseUrl => switch (this) {
-        AiProvider.deepseek => 'https://api.deepseek.com/v1',
-        AiProvider.openai => 'https://api.openai.com/v1',
-      };
+    AiProvider.deepseek => 'https://api.deepseek.com/v1',
+    AiProvider.openai => 'https://api.openai.com/v1',
+  };
 
   String get defaultModel => switch (this) {
-        AiProvider.deepseek => 'deepseek-v4-flash',
-        AiProvider.openai => 'gpt-5.6-sol',
-      };
+    AiProvider.deepseek => 'deepseek-v4-flash',
+    AiProvider.openai => 'gpt-5.6-sol',
+  };
 
   /// 可选的模型列表（随提供商变化，UI 下拉选择）。
   List<String> get modelOptions => switch (this) {
-        AiProvider.deepseek => const ['deepseek-v4-flash', 'deepseek-v4-pro'],
-        AiProvider.openai => const [
-            'gpt-5.6-sol',
-            'gpt-5.6-terra',
-            'gpt-5.6-luna',
-          ],
-      };
+    AiProvider.deepseek => const ['deepseek-v4-flash', 'deepseek-v4-pro'],
+    AiProvider.openai => const ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+  };
 }
 
 /// AI 排课服务配置（固定设置）。
@@ -76,16 +72,13 @@ enum StudyIntensity {
   stressed;
 
   String get name => switch (this) {
-        StudyIntensity.relaxed => 'relaxed',
-        StudyIntensity.medium => 'medium',
-        StudyIntensity.stressed => 'stressed',
-      };
+    StudyIntensity.relaxed => 'relaxed',
+    StudyIntensity.medium => 'medium',
+    StudyIntensity.stressed => 'stressed',
+  };
 
-  static StudyIntensity fromName(String? value) =>
-      StudyIntensity.values.firstWhere(
-        (i) => i.name == value,
-        orElse: () => StudyIntensity.medium,
-      );
+  static StudyIntensity fromName(String? value) => StudyIntensity.values
+      .firstWhere((i) => i.name == value, orElse: () => StudyIntensity.medium);
 }
 
 /// 排课开始时间：从现在开始（今天剩余时段）或从明天开始。
@@ -94,15 +87,12 @@ enum ScheduleStartMode {
   tomorrow;
 
   String get name => switch (this) {
-        ScheduleStartMode.now => 'now',
-        ScheduleStartMode.tomorrow => 'tomorrow',
-      };
+    ScheduleStartMode.now => 'now',
+    ScheduleStartMode.tomorrow => 'tomorrow',
+  };
 
-  static ScheduleStartMode fromName(String? value) =>
-      ScheduleStartMode.values.firstWhere(
-        (m) => m.name == value,
-        orElse: () => ScheduleStartMode.now,
-      );
+  static ScheduleStartMode fromName(String? value) => ScheduleStartMode.values
+      .firstWhere((m) => m.name == value, orElse: () => ScheduleStartMode.now);
 }
 
 /// 本次排课设置（记住上次选择）。
@@ -122,14 +112,15 @@ class AiSchedulePrefs {
   final ScheduleStartMode startMode; // 从现在开始 / 从明天开始
 
   Map<String, dynamic> toJson() => {
-        'intensity': intensity.name,
-        'days': days,
-        'notes': notes,
-        'timePreference': timePreference,
-        'startMode': startMode.name,
-      };
+    'intensity': intensity.name,
+    'days': days,
+    'notes': notes,
+    'timePreference': timePreference,
+    'startMode': startMode.name,
+  };
 
-  factory AiSchedulePrefs.fromJson(Map<String, dynamic> json) => AiSchedulePrefs(
+  factory AiSchedulePrefs.fromJson(Map<String, dynamic> json) =>
+      AiSchedulePrefs(
         intensity: StudyIntensity.fromName(json['intensity'] as String?),
         days: (json['days'] as num?)?.toInt() ?? 7,
         notes: json['notes'] as String? ?? '',
@@ -154,13 +145,7 @@ class AiScheduleSuccess {
 }
 
 /// AI 排课失败类型。
-enum AiScheduleErrorType {
-  notConfigured,
-  network,
-  http,
-  parse,
-  empty,
-}
+enum AiScheduleErrorType { notConfigured, network, http, parse, empty }
 
 /// AI 排课失败（含用户可读中文信息）。
 class AiScheduleError {
@@ -192,8 +177,7 @@ const aiScheduleSystemPrompt = '''
 
 /// AI 排课客户端：组装 Prompt → 调用 OpenAI 兼容接口 → 解析固定格式。
 class AiScheduler {
-  AiScheduler({http.Client? client})
-      : _client = client ?? _defaultClient();
+  AiScheduler({http.Client? client}) : _client = client ?? _defaultClient();
 
   final http.Client _client;
 
@@ -333,7 +317,8 @@ class AiScheduler {
         return AiScheduleOutcomeError(
           AiScheduleError(
             type: AiScheduleErrorType.network,
-            message: 'AI 响应超时（${config.timeout.inSeconds} 秒）：${config.baseUrl.trim()}',
+            message:
+                'AI 响应超时（${config.timeout.inSeconds} 秒）：${config.baseUrl.trim()}',
           ),
         );
       } catch (e) {
@@ -370,7 +355,10 @@ class AiScheduler {
     }
     if (parsed.ordered.isEmpty) {
       return AiScheduleOutcomeError(
-        AiScheduleError(type: AiScheduleErrorType.empty, message: 'AI 没有返回任何课程顺序'),
+        AiScheduleError(
+          type: AiScheduleErrorType.empty,
+          message: 'AI 没有返回任何课程顺序',
+        ),
       );
     }
     final usage = _extractUsage(response.body);
@@ -379,7 +367,8 @@ class AiScheduler {
   }
 
   /// 读取 SSE 流式响应，逐块回调增量内容，返回累积内容与 usage。
-  Future<({String content, int promptTokens, int completionTokens})?> _consumeStream(
+  Future<({String content, int promptTokens, int completionTokens})?>
+  _consumeStream(
     http.StreamedResponse resp,
     Duration timeout,
     void Function(String delta) onToken,
@@ -388,10 +377,11 @@ class AiScheduler {
     var promptTokens = 0;
     var completionTokens = 0;
     try {
-      await for (final line in resp.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .timeout(timeout)) {
+      await for (final line
+          in resp.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              .timeout(timeout)) {
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue;
         final data = trimmed.substring(5).trim();
@@ -403,6 +393,13 @@ class AiScheduler {
           if (choices is List && choices.isNotEmpty) {
             final delta = choices.first['delta'];
             if (delta is Map) {
+              // 推理过程（如 deepseek 的 reasoning_content）：仅实时展示，
+              // 不写入 content，避免影响最终 JSON 解析。
+              final reasoning =
+                  delta['reasoning_content'] ?? delta['reasoning'];
+              if (reasoning is String && reasoning.isNotEmpty) {
+                onToken(reasoning);
+              }
               final content = delta['content'];
               if (content is String && content.isNotEmpty) {
                 buffer.write(content);
@@ -413,7 +410,8 @@ class AiScheduler {
           final usage = obj['usage'];
           if (usage is Map) {
             promptTokens = (usage['prompt_tokens'] as num?)?.toInt() ?? 0;
-            completionTokens = (usage['completion_tokens'] as num?)?.toInt() ?? 0;
+            completionTokens =
+                (usage['completion_tokens'] as num?)?.toInt() ?? 0;
           }
         } catch (_) {}
       }
@@ -445,7 +443,10 @@ class AiScheduler {
 
   /// 网络诊断：GET 根路径 + 三个尺寸的 POST（300B/1200B/2500B）。
   /// 用于精确定位网络可传输的请求体上限（MTU 黑洞阈值）。
-  Future<String> diagnoseConnection(String baseUrl, {String apiKey = ''}) async {
+  Future<String> diagnoseConnection(
+    String baseUrl, {
+    String apiKey = '',
+  }) async {
     final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     final getUri = Uri.parse('$base/');
     final postUri = Uri.parse('$base/chat/completions');
@@ -505,8 +506,9 @@ class AiScheduler {
       StudyIntensity.medium => '中等',
       StudyIntensity.stressed => '压力',
     };
-    final timePreference =
-        prefs.timePreference.trim().isEmpty ? '全天' : prefs.timePreference.trim();
+    final timePreference = prefs.timePreference.trim().isEmpty
+        ? '全天'
+        : prefs.timePreference.trim();
     final notes = prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim();
     final courseLines = [
       for (final c in courses)
@@ -561,7 +563,9 @@ class AiScheduler {
       final List<dynamic> rawItems;
       String reason = '';
       if (decoded is Map) {
-        rawItems = decoded['order'] is List ? decoded['order'] as List : const [];
+        rawItems = decoded['order'] is List
+            ? decoded['order'] as List
+            : const [];
         reason = decoded['reason'] as String? ?? '';
       } else if (decoded is List) {
         rawItems = decoded;
@@ -576,7 +580,10 @@ class AiScheduler {
         if (courseId is! String || courseId.trim().isEmpty) continue;
         final restRaw = item['restAfterMinutes'];
         final rest = restRaw is num ? restRaw.toInt() : 0;
-        ordered.add((courseId: courseId.trim(), restAfterMinutes: rest < 0 ? 0 : rest));
+        ordered.add((
+          courseId: courseId.trim(),
+          restAfterMinutes: rest < 0 ? 0 : rest,
+        ));
         final color = _parseColor(item['color']);
         if (color != null) {
           colors[courseId.trim()] = color;
@@ -618,7 +625,7 @@ class AiScheduler {
 /// AI 排课配置读写：提供商/Base URL/模型 → SharedPreferences；API Key → 加密存储。
 class AiScheduleSettings {
   AiScheduleSettings({SecretStore? secretStore})
-      : _secretStore = secretStore ?? SecretStore();
+    : _secretStore = secretStore ?? SecretStore();
 
   static const _providerKey = 'ai_schedule_provider';
   static const _baseUrlKey = 'ai_schedule_base_url';
@@ -704,22 +711,22 @@ class AiModelUsage {
 
 /// 模型价格（美元/百万 token），用于估算花费（仅作参考）。
 double _inputPricePerMillion(String model) => switch (model) {
-      'deepseek-v4-flash' => 0.1,
-      'deepseek-v4-pro' => 0.5,
-      'gpt-5.6-luna' => 0.4,
-      'gpt-5.6-terra' => 1.0,
-      'gpt-5.6-sol' => 2.5,
-      _ => 1.0,
-    };
+  'deepseek-v4-flash' => 0.1,
+  'deepseek-v4-pro' => 0.5,
+  'gpt-5.6-luna' => 0.4,
+  'gpt-5.6-terra' => 1.0,
+  'gpt-5.6-sol' => 2.5,
+  _ => 1.0,
+};
 
 double _outputPricePerMillion(String model) => switch (model) {
-      'deepseek-v4-flash' => 0.4,
-      'deepseek-v4-pro' => 2.0,
-      'gpt-5.6-luna' => 1.6,
-      'gpt-5.6-terra' => 4.0,
-      'gpt-5.6-sol' => 10.0,
-      _ => 4.0,
-    };
+  'deepseek-v4-flash' => 0.4,
+  'deepseek-v4-pro' => 2.0,
+  'gpt-5.6-luna' => 1.6,
+  'gpt-5.6-terra' => 4.0,
+  'gpt-5.6-sol' => 10.0,
+  _ => 4.0,
+};
 
 /// 估算一次用量的花费（美元）。
 double estimateCostInUsd(AiModelUsage usage) {
@@ -792,15 +799,13 @@ class AiUsageStats {
           model: e.key,
           requests: (e.value['requests'] as num?)?.toInt() ?? 0,
           promptTokens: (e.value['promptTokens'] as num?)?.toInt() ?? 0,
-          completionTokens:
-              (e.value['completionTokens'] as num?)?.toInt() ?? 0,
+          completionTokens: (e.value['completionTokens'] as num?)?.toInt() ?? 0,
         ),
     ]..sort((a, b) => b.totalTokens.compareTo(a.totalTokens));
     return result;
   }
 
-  int get totalRequests =>
-      entries.fold(0, (sum, e) => sum + e.requests);
+  int get totalRequests => entries.fold(0, (sum, e) => sum + e.requests);
 
   int get totalTokens => entries.fold(0, (sum, e) => sum + e.totalTokens);
 

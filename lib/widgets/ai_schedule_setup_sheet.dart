@@ -74,10 +74,11 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       lunchEndMinute: provider.generalLunchEndMinute,
       endMinute: provider.generalDayEndMinute,
     );
-    final slots = availability.isEmpty ? const <AvailabilitySlot>[] : availability.first;
+    final slots = availability.isEmpty
+        ? const <AvailabilitySlot>[]
+        : availability.first;
     return slots
-        .map((s) =>
-            '${_hhmm(s.startMinute)}-${_hhmm(s.endMinute)}')
+        .map((s) => '${_hhmm(s.startMinute)}-${_hhmm(s.endMinute)}')
         .join(' 与 ');
   }
 
@@ -133,8 +134,7 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
     await showAppModalSheet<void>(
       context: context,
       maxWidth: appSheetWidthMedium,
-      builder: (sheetContext) =>
-          AiScheduleProgressSheet(store: widget.store),
+      builder: (sheetContext) => AiScheduleProgressSheet(store: widget.store),
     );
   }
 
@@ -168,105 +168,100 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
               : const Text('开始 AI 排课'),
         ),
       ],
-      child: AbsorbPointer(
-        absorbing: _scheduling,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-          Text('学习强度', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          SegmentedButton<StudyIntensity>(
-            segments: const [
-              ButtonSegment(
-                value: StudyIntensity.relaxed,
-                icon: Icon(Icons.spa_outlined),
-                label: Text('轻松 🍃'),
-              ),
-              ButtonSegment(
-                value: StudyIntensity.medium,
-                icon: Icon(Icons.balance_outlined),
-                label: Text('中等 ⚖️'),
-              ),
-              ButtonSegment(
-                value: StudyIntensity.stressed,
-                icon: Icon(Icons.local_fire_department_outlined),
-                label: Text('压力 🔥'),
-              ),
-            ],
-            selected: {_intensity},
-            onSelectionChanged: (selection) => setState(() => _intensity = selection.first),
-          ),
-          const SizedBox(height: 16),
-          Text('计划 $_days 天学完', style: theme.textTheme.titleSmall),
-          Slider(
-            value: _days.toDouble(),
-            min: 1,
-            max: 14,
-            divisions: 13,
-            label: '$_days 天',
-            onChanged: (v) => setState(() => _days = v.round()),
-          ),
-          const SizedBox(height: 16),
-          Text('开始时间', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          SegmentedButton<ScheduleStartMode>(
-            segments: const [
-              ButtonSegment(
-                value: ScheduleStartMode.now,
-                icon: Icon(Icons.play_arrow_outlined),
-                label: Text('从现在开始'),
-              ),
-              ButtonSegment(
-                value: ScheduleStartMode.tomorrow,
-                icon: Icon(Icons.event_available_outlined),
-                label: Text('从明天开始'),
-              ),
-            ],
-            selected: {_startMode},
-            onSelectionChanged: (selection) => setState(() => _startMode = selection.first),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '备注（可选）',
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _notes,
-            enabled: true,
-            maxLines: 2,
-            minLines: 1,
-            decoration: const InputDecoration(
-              hintText: '这几天哪些时间已有安排？如：周一下午有课、周三晚上有会…',
-              border: OutlineInputBorder(),
-              isDense: true,
+      child: _scheduling
+          ? AiScheduleConversation(store: widget.store)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('学习强度', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<StudyIntensity>(
+                  segments: const [
+                    ButtonSegment(
+                      value: StudyIntensity.relaxed,
+                      icon: Icon(Icons.spa_outlined),
+                      label: Text('轻松 🍃'),
+                    ),
+                    ButtonSegment(
+                      value: StudyIntensity.medium,
+                      icon: Icon(Icons.balance_outlined),
+                      label: Text('中等 ⚖️'),
+                    ),
+                    ButtonSegment(
+                      value: StudyIntensity.stressed,
+                      icon: Icon(Icons.local_fire_department_outlined),
+                      label: Text('压力 🔥'),
+                    ),
+                  ],
+                  selected: {_intensity},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _intensity = selection.first),
+                ),
+                const SizedBox(height: 16),
+                Text('计划 $_days 天学完', style: theme.textTheme.titleSmall),
+                Slider(
+                  value: _days.toDouble(),
+                  min: 1,
+                  max: 14,
+                  divisions: 13,
+                  label: '$_days 天',
+                  onChanged: (v) => setState(() => _days = v.round()),
+                ),
+                const SizedBox(height: 16),
+                Text('开始时间', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<ScheduleStartMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: ScheduleStartMode.now,
+                      icon: Icon(Icons.play_arrow_outlined),
+                      label: Text('从现在开始'),
+                    ),
+                    ButtonSegment(
+                      value: ScheduleStartMode.tomorrow,
+                      icon: Icon(Icons.event_available_outlined),
+                      label: Text('从明天开始'),
+                    ),
+                  ],
+                  selected: {_startMode},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _startMode = selection.first),
+                ),
+                const SizedBox(height: 8),
+                Text('备注（可选）', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _notes,
+                  enabled: true,
+                  maxLines: 2,
+                  minLines: 1,
+                  decoration: const InputDecoration(
+                    hintText: '这几天哪些时间已有安排？如：周一下午有课、周三晚上有会…',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('时间偏好（可选，留空=全天）', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _timePreference,
+                  enabled: true,
+                  decoration: const InputDecoration(
+                    hintText: '如：晚上 19:00-22:00、每天上午',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '每天可用时间窗：$_windowDescription（在设置-通用显示设置中调整）',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '时间偏好（可选，留空=全天）',
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _timePreference,
-            enabled: true,
-            decoration: const InputDecoration(
-              hintText: '如：晚上 19:00-22:00、每天上午',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '每天可用时间窗：$_windowDescription（在设置-通用显示设置中调整）',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          ],
-        ),
-      ),
     );
   }
 }
