@@ -306,26 +306,38 @@ class _OccurrenceCard extends StatelessWidget {
                 );
 
                 if (dense || narrow || !title.showDetails) {
-                  // 窄屏/紧凑也显示开始-结束时间（用户要求课程格子带时间）；
-                  // 整体 FittedBox 缩放，格子高度不足时自动缩小，避免溢出。
+                  // 紧凑/窄屏也显示开始-结束时间（分两行：标题一行、时间一行）。
+                  // 标题字号保持不变、单行省略号截断；时间正常字号；
+                  // 格子矮时内容超出部分裁剪（不再整体缩放），保证时间始终可见。
                   return Align(
                     alignment: AlignmentDirectional.topStart,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.topStart,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          titleWidget,
-                          if (narrow || !dense)
-                            Text(
-                              _formatOccurrenceTime(context, occurrence),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: detailStyle,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => ClipRect(
+                        child: OverflowBox(
+                          alignment: AlignmentDirectional.topStart,
+                          maxHeight: double.infinity,
+                          child: SizedBox(
+                            width: constraints.maxWidth,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  titleText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: titleStyle,
+                                ),
+                                Text(
+                                  _formatOccurrenceTime(context, occurrence),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: detailStyle,
+                                ),
+                              ],
                             ),
-                        ],
+                          ),
+                        ),
                       ),
                     ),
                   );
