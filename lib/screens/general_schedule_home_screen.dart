@@ -17,6 +17,8 @@ import '../utils/general_schedule_colors.dart';
 import '../widgets/app_modal_sheet.dart';
 import '../widgets/ai_schedule_setup_sheet.dart';
 import '../widgets/course_pending_sheet.dart';
+import '../widgets/share_schedule_sheet.dart';
+import '../widgets/timeline_precision_sheet.dart';
 import '../widgets/expressive_empty_state.dart';
 import '../widgets/expressive_dialog.dart';
 import '../widgets/expressive_motion.dart';
@@ -204,6 +206,22 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
                             });
                           },
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 时间精度调节（矮半弹窗）。
+                      IconButton(
+                        tooltip: '时间精度调节',
+                        icon: const Icon(Icons.zoom_in_map_outlined),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _openTimelinePrecisionSheet(provider),
+                      ),
+                      // 分享日程。
+                      IconButton(
+                        tooltip: '分享日程',
+                        icon: const Icon(Icons.ios_share),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () =>
+                            _openShareScheduleSheet(context, provider),
                       ),
                     ],
                   );
@@ -671,6 +689,19 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     ];
     store.replaceSlots(next);
     setState(() {});
+  }
+
+  /// 时间精度调节（矮半弹窗）。
+  void _openTimelinePrecisionSheet(TimetableProvider provider) {
+    showTimelinePrecisionSheet(context, provider: provider);
+  }
+
+  /// 分享日程（当天 / 7 天，图片 / md / json / 纯文字）。
+  void _openShareScheduleSheet(
+    BuildContext context,
+    TimetableProvider provider,
+  ) {
+    showShareScheduleSheet(context, provider: provider);
   }
 
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。
