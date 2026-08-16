@@ -51,6 +51,13 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   bool _settingsPageOpen = false;
   bool _pendingSheetOpen = false;
 
+  /// 课程移动历史（撤销/重做）：每次移动前快照受影响课程的槽位。
+  final List<Map<String, List<ScheduleSlot>>> _undoStack = [];
+  final List<Map<String, List<ScheduleSlot>>> _redoStack = [];
+
+  bool get _canUndo => _undoStack.isNotEmpty;
+  bool get _canRedo => _redoStack.isNotEmpty;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -135,46 +142,70 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 420;
                   Widget? label(String text) => compact ? null : Text(text);
-                  return SegmentedButton<String>(
-                    segments: [
-                      ButtonSegment(
-                        value: generalViewWeek,
-                        icon: const Icon(Icons.view_week_outlined),
-                        label: label(l10n.viewWeek),
-                        tooltip: l10n.viewWeek,
+                  return Row(
+                    children: [
+                      // 撤销/重做课程移动。
+                      IconButton(
+                        tooltip: '撤销移动',
+                        icon: const Icon(Icons.undo),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _canUndo ? _undoMove : null,
                       ),
-                      ButtonSegment(
-                        value: generalViewDay,
-                        icon: const Icon(Icons.view_day_outlined),
-                        label: label(l10n.viewDay),
-                        tooltip: l10n.viewDay,
+                      IconButton(
+                        tooltip: '恢复移动',
+                        icon: const Icon(Icons.redo),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _canRedo ? _redoMove : null,
                       ),
-                      ButtonSegment(
-                        value: generalViewList,
-                        icon: const Icon(Icons.list_alt_outlined),
-                        label: label(l10n.viewList),
-                        tooltip: l10n.viewList,
-                      ),
-                      ButtonSegment(
-                        value: generalViewMonth,
-                        icon: const Icon(Icons.calendar_view_month_outlined),
-                        label: label(l10n.viewMonth),
-                        tooltip: l10n.viewMonth,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SegmentedButton<String>(
+                          segments: [
+                            ButtonSegment(
+                              value: generalViewWeek,
+                              icon: const Icon(Icons.view_week_outlined),
+                              label: label(l10n.viewWeek),
+                              tooltip: l10n.viewWeek,
+                            ),
+                            ButtonSegment(
+                              value: generalViewDay,
+                              icon: const Icon(Icons.view_day_outlined),
+                              label: label(l10n.viewDay),
+                              tooltip: l10n.viewDay,
+                            ),
+                            ButtonSegment(
+                              value: generalViewList,
+                              icon: const Icon(Icons.list_alt_outlined),
+                              label: label(l10n.viewList),
+                              tooltip: l10n.viewList,
+                            ),
+                            ButtonSegment(
+                              value: generalViewMonth,
+                              icon: const Icon(
+                                Icons.calendar_view_month_outlined,
+                              ),
+                              label: label(l10n.viewMonth),
+                              tooltip: l10n.viewMonth,
+                            ),
+                          ],
+                          selected: {view},
+                          showSelectedIcon: false,
+                          style: compact
+                              ? SegmentedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                )
+                              : null,
+                          onSelectionChanged: (selection) {
+                            setState(() {
+                              _view = selection.first;
+                            });
+                          },
+                        ),
                       ),
                     ],
-                    selected: {view},
-                    showSelectedIcon: false,
-                    style: compact
-                        ? SegmentedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          )
-                        : null,
-                    onSelectionChanged: (selection) {
-                      setState(() {
-                        _view = selection.first;
-                      });
-                    },
                   );
                 },
               ),
@@ -536,7 +567,7 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
   }
 
   /// 长按拖拽课程日程到新时间/新日期：更新 LinkStudy 槽位，
-  /// 网格同步监听 store 变化自动重建事件。
+  /// 整门课所有段一起平移（保持段间相对间隔），网格同步自动重建事件。
   void _moveLinkCourseSlot(
     BuildContext context,
     GeneralEventOccurrence occurrence,
@@ -548,21 +579,78 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     if (!eventId.startsWith(LinkStudyGridSync.eventIdPrefix)) return;
     final courseId = eventId.substring(LinkStudyGridSync.eventIdPrefix.length);
     final store = LinkCourseStore.instance;
-    final slot = store.slots.where((s) => s.courseId == courseId).firstOrNull;
-    if (slot == null) return;
-    final duration = slot.endMinute - slot.startMinute;
-    final endMinute = (startMinute + duration).clamp(0, 24 * 60);
-    if (endMinute <= startMinute) return;
+    final slots = store.slots.where((s) => s.courseId == courseId).toList()
+      ..sort((a, b) {
+        final da = a.epochDay ?? 0;
+        final db = b.epochDay ?? 0;
+        return da != db
+            ? da.compareTo(db)
+            : a.startMinute.compareTo(b.startMinute);
+      });
+    if (slots.isEmpty) return;
+    // 找到被拖动的段：按起止时间匹配 occurrence。
+    final draggedStart = occurrence.start.hour * 60 + occurrence.start.minute;
+    final draggedEnd = occurrence.end.hour * 60 + occurrence.end.minute;
+    var anchorIndex = slots.indexWhere(
+      (s) => s.startMinute == draggedStart && s.endMinute == draggedEnd,
+    );
+    if (anchorIndex < 0) anchorIndex = 0;
     final day = DateTime(targetDay.year, targetDay.month, targetDay.day);
+    // 移动前快照该课程槽位（用于撤销）。
+    _undoStack.add({
+      courseId: [
+        for (final s in slots)
+          ScheduleSlot(
+            courseId: s.courseId,
+            epochDay: s.epochDay,
+            weekday: s.weekday,
+            startMinute: s.startMinute,
+            endMinute: s.endMinute,
+            colorValue: s.colorValue,
+          ),
+      ],
+    });
+    _redoStack.clear();
+    setState(() {});
     unawaited(
       store.moveSlot(
         courseId,
         epochDay: epochDayOf(day),
         weekday: day.weekday,
         startMinute: startMinute,
-        endMinute: endMinute,
+        anchorSlotIndex: anchorIndex,
       ),
     );
+  }
+
+  /// 撤销上一次课程移动：恢复该课程移动前的槽位。
+  void _undoMove() {
+    if (!_canUndo) return;
+    final snapshot = _undoStack.removeLast();
+    _redoStack.add(snapshot);
+    _restoreSlotSnapshot(snapshot);
+  }
+
+  /// 重做被撤销的课程移动。
+  void _redoMove() {
+    if (!_canRedo) return;
+    final snapshot = _redoStack.removeLast();
+    _undoStack.add(snapshot);
+    _restoreSlotSnapshot(snapshot);
+  }
+
+  /// 用快照覆盖课程槽位（撤销/重做共用）。
+  void _restoreSlotSnapshot(Map<String, List<ScheduleSlot>> snapshot) {
+    final store = LinkCourseStore.instance;
+    final courseId = snapshot.keys.first;
+    final slots = snapshot[courseId]!;
+    final next = <ScheduleSlot>[
+      for (final s in store.slots)
+        if (s.courseId != courseId) s,
+      ...slots,
+    ];
+    store.replaceSlots(next);
+    setState(() {});
   }
 
   /// 打开未排课池：勾选课程 → AI 排课设置 → 完成。

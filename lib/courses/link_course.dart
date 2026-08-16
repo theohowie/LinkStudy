@@ -539,36 +539,62 @@ class LinkCourseStore extends ChangeNotifier {
   }
 
   /// 手动调整课程槽位的时间（网格长按拖拽联动）：
-  /// 替换该课程所有槽位为新的起止时间与日期（可换天），并持久化。
-  /// [epochDay]/[weekday] 为新日期（weekday 1=周一…7=周日）。
+  /// 以 [anchorSlotIndex]（默认 0，即最早一段）为锚点，把整门课的所有段
+  /// 一起平移到新日期/新开始时间，保持各段之间的相对间隔与各自时长不变。
+  ///
+  /// 例如数据结构被拆成 4 段，拖动第 1 段 → 4 段整体平移，
+  /// 段间休息间隔保持不变，不会重叠。
   Future<void> moveSlot(
     String courseId, {
     required int epochDay,
     required int weekday,
     required int startMinute,
-    required int endMinute,
+    int anchorSlotIndex = 0,
   }) async {
-    if (endMinute <= startMinute) return;
+    final slots = _slots.where((s) => s.courseId == courseId).toList()
+      ..sort((a, b) {
+        final da = a.epochDay ?? 0;
+        final db = b.epochDay ?? 0;
+        return da != db
+            ? da.compareTo(db)
+            : a.startMinute.compareTo(b.startMinute);
+      });
+    if (slots.isEmpty) return;
+    final anchor = slots[anchorSlotIndex.clamp(0, slots.length - 1)];
+    // 锚点原始起始分钟与日期。
+    final anchorDay = anchor.epochDay ?? 0;
+    final anchorStart = anchor.startMinute;
+    // 目标锚点分钟偏移（相对新日期 0 点）与目标日期的分钟偏移。
+    final targetAnchorMinute = startMinute; // 新锚点开始分钟(当日)
+    final dayDelta = epochDay - anchorDay;
+    final minuteDelta = targetAnchorMinute - anchorStart;
+
     final next = <ScheduleSlot>[];
-    var replaced = false;
+    var changed = false;
     for (final s in _slots) {
-      if (s.courseId == courseId) {
-        next.add(
-          ScheduleSlot(
-            courseId: s.courseId,
-            epochDay: epochDay,
-            weekday: weekday,
-            startMinute: startMinute,
-            endMinute: endMinute,
-            colorValue: s.colorValue,
-          ),
-        );
-        replaced = true;
-      } else {
+      if (s.courseId != courseId) {
         next.add(s);
+        continue;
       }
+      final oldDay = s.epochDay ?? 0;
+      final newDay = oldDay + dayDelta;
+      final newStart = s.startMinute + minuteDelta;
+      final newEnd = s.endMinute + minuteDelta;
+      if (newStart < 0 || newEnd > 24 * 60) continue; // 越界则跳过该段
+      final date = localDateFromEpochDay(newDay);
+      next.add(
+        ScheduleSlot(
+          courseId: s.courseId,
+          epochDay: newDay,
+          weekday: date.weekday,
+          startMinute: newStart,
+          endMinute: newEnd,
+          colorValue: s.colorValue,
+        ),
+      );
+      changed = true;
     }
-    if (!replaced) return;
+    if (!changed) return;
     _slots = next;
     notifyListeners();
     await _persist();
@@ -584,6 +610,20 @@ class LinkCourseStore extends ChangeNotifier {
     _slots = [];
     _loaded = true;
     notifyListeners();
+  }
+
+  /// 仅测试用：直接注入槽位（构造多段课程场景）。
+  @visibleForTesting
+  void injectSlotsForTest(List<ScheduleSlot> slots) {
+    _slots = [...slots];
+    notifyListeners();
+  }
+
+  /// 替换全部槽位（撤销/重做课程移动用），并持久化。
+  Future<void> replaceSlots(List<ScheduleSlot> slots) async {
+    _slots = [...slots];
+    notifyListeners();
+    await _persist();
   }
 
   /// 仅测试用：跳过持久化（widget 测试的 FakeAsync 环境无法完成真实文件 I/O）。

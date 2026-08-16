@@ -169,9 +169,8 @@ void main() {
       );
       expect(result.failures, isEmpty);
       // 同课两段 → 两个槽位。
-      final slots =
-          store.slots.where((s) => s.courseId == a.id).toList()
-            ..sort((x, y) => x.startMinute.compareTo(y.startMinute));
+      final slots = store.slots.where((s) => s.courseId == a.id).toList()
+        ..sort((x, y) => x.startMinute.compareTo(y.startMinute));
       expect(slots, hasLength(2));
       expect(slots[0].startMinute, 9 * 60);
       expect(slots[0].endMinute, 9 * 60 + 50);
@@ -322,12 +321,51 @@ void main() {
         epochDay: before.epochDay ?? 0,
         weekday: before.weekday,
         startMinute: 10 * 60,
-        endMinute: 10 * 60 + 40,
       );
       final after = store.slots.single;
       expect(after.startMinute, 10 * 60);
       expect(after.endMinute, 10 * 60 + 40);
       expect(after.colorValue, before.colorValue);
+    });
+
+    test('moveSlot 整门课多段一起平移,保持段间相对间隔', () async {
+      final store = LinkCourseStore.instance;
+      store.debugClear();
+      final course = await store.addCourse(
+        url: 'https://example.com/move-multi',
+        title: '数据结构(4段)',
+        durationMinutes: 100,
+      );
+      // 手工构造 4 段：09:00-09:50、10:00-10:50(隔10分钟)…保持相对间隔。
+      final baseDay = epochDayOf(DateTime(2026, 3, 10));
+      store.injectSlotsForTest([
+        for (var i = 0; i < 4; i++)
+          ScheduleSlot(
+            courseId: course.id,
+            epochDay: baseDay,
+            weekday: 3,
+            startMinute: (9 * 60) + i * 60,
+            endMinute: (9 * 60 + 50) + i * 60,
+          ),
+      ]);
+
+      // 拖动第 1 段(09:00-09:50)到 14:00 → 所有段平移 +5 小时,间隔不变。
+      await store.moveSlot(
+        course.id,
+        epochDay: baseDay,
+        weekday: 3,
+        startMinute: 14 * 60,
+        anchorSlotIndex: 0,
+      );
+      final slots = store.slots.where((s) => s.courseId == course.id).toList()
+        ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+      expect(slots, hasLength(4));
+      expect(slots[0].startMinute, 14 * 60);
+      expect(slots[1].startMinute, 15 * 60);
+      expect(slots[2].startMinute, 16 * 60);
+      expect(slots[3].startMinute, 17 * 60);
+      // 段间间隔保持 10 分钟。
+      expect(slots[1].startMinute - slots[0].endMinute, 10);
     });
 
     test('clearSlotsForCourses 一键清空课程槽位(回未排课池)', () async {

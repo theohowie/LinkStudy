@@ -45,6 +45,10 @@ class _WeekCalendarViewState extends State<_WeekCalendarView> {
   late final DateTime _baseWeekStart;
   late final PageController _controller;
   late int _currentPage;
+  double _scale = 1.0;
+
+  /// 时间刻度单位（分钟/格）：默认 60；放大→更小(最小5)，缩小→更大(最大480)。
+  int get _unitMinutes => (60 / _scale).round().clamp(5, 8 * 60);
 
   @override
   void initState() {
@@ -126,23 +130,40 @@ class _WeekCalendarViewState extends State<_WeekCalendarView> {
 
   @override
   Widget build(BuildContext context) {
-    return PageView.builder(
-      key: _generalWeekPagerKey,
-      controller: _controller,
-      onPageChanged: _handlePageChanged,
-      itemBuilder: (context, index) {
-        final weekStart = _weekStartForPage(index);
-        return _WeekTimelinePage(
-          weekStart: weekStart,
-          selectedDate: weekStart.add(Duration(days: _selectedWeekdayOffset())),
-          provider: widget.provider,
-          filter: widget.filter,
-          onEmptySlotTap: widget.onEmptySlotTap,
-          onOccurrenceTap: widget.onOccurrenceTap,
-          onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
-          onMoveCourse: widget.onMoveCourse,
+    // 双指缩放：scale > 1 放大（单位变小），< 1 缩小（单位变大）。
+    return GestureDetector(
+      onScaleStart: (_) {},
+      onScaleUpdate: (details) {
+        if (details.pointerCount < 2) return;
+        final next = (_scale * details.scale).clamp(
+          60 / 480,
+          60 / 5,
         );
+        if ((next - _scale).abs() > 0.01) {
+          setState(() => _scale = next);
+        }
       },
+      child: PageView.builder(
+        key: _generalWeekPagerKey,
+        controller: _controller,
+        onPageChanged: _handlePageChanged,
+        itemBuilder: (context, index) {
+          final weekStart = _weekStartForPage(index);
+          return _WeekTimelinePage(
+            weekStart: weekStart,
+            selectedDate: weekStart.add(
+              Duration(days: _selectedWeekdayOffset()),
+            ),
+            provider: widget.provider,
+            filter: widget.filter,
+            onEmptySlotTap: widget.onEmptySlotTap,
+            onOccurrenceTap: widget.onOccurrenceTap,
+            onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
+            onMoveCourse: widget.onMoveCourse,
+            unitMinutes: _unitMinutes,
+          );
+        },
+      ),
     );
   }
 }
@@ -157,6 +178,7 @@ class _WeekTimelinePage extends StatelessWidget {
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
     this.onMoveCourse,
+    this.unitMinutes = 60,
   });
 
   final DateTime weekStart;
@@ -172,6 +194,7 @@ class _WeekTimelinePage extends StatelessWidget {
     int startMinute,
     int deltaMinutes,
   )? onMoveCourse;
+  final int unitMinutes;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +217,7 @@ class _WeekTimelinePage extends StatelessWidget {
       onOccurrenceTap: onOccurrenceTap,
       onMoreOccurrencesTap: onMoreOccurrencesTap,
       onMoveCourse: onMoveCourse,
+      unitMinutes: unitMinutes,
     );
   }
 }
@@ -761,11 +785,12 @@ class _CalendarTimeline extends StatelessWidget {
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
     this.onMoveCourse,
+    this.unitMinutes = 60,
   });
 
+  static const double _baseHourHeight = 72;
   static const double _headerHeight = 56;
   static const double _allDayHeight = 74;
-  static const double _hourHeight = 72;
   static const double _timeLabelVerticalPadding = 12;
 
   final List<DateTime> days;
@@ -788,6 +813,9 @@ class _CalendarTimeline extends StatelessWidget {
     int deltaMinutes,
   )? onMoveCourse;
 
+  /// 左侧时间刻度单位（分钟/格）。放大→更小，缩小→更大。
+  final int unitMinutes;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -796,10 +824,12 @@ class _CalendarTimeline extends StatelessWidget {
     }
     final startMinutes = startMinute;
     final endMinutes = endMinute;
+    // 每单位(unitMinutes)高度恒定 72px → 1 小时高度随单位缩放。
+    final hourHeight = _baseHourHeight * 60 / unitMinutes.clamp(5, 8 * 60);
     final gridHeight =
-        math.max(1, endMinute - startMinute) * (_hourHeight / 60);
+        math.max(1, endMinute - startMinute) * (hourHeight / 60);
     final contentHeight = gridHeight + _timeLabelVerticalPadding * 2;
-    final minuteHeight = _hourHeight / 60;
+    final minuteHeight = hourHeight / 60;
     final allDayOccurrencesByDay = [
       for (final day in days) _allDayOccurrencesFor(day),
     ];
@@ -885,8 +915,9 @@ class _CalendarTimeline extends StatelessWidget {
                           startMinute: startMinute,
                           endMinute: endMinute,
                           gridMinutes: gridMinutes,
-                          hourHeight: _hourHeight,
+                          hourHeight: hourHeight,
                           topOffset: _timeLabelVerticalPadding,
+                          unitMinutes: unitMinutes,
                         ),
                         for (var index = 0; index < days.length; index++)
                           Positioned(

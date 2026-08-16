@@ -125,6 +125,7 @@ class _GridBackground extends StatelessWidget {
     required this.gridMinutes,
     required this.hourHeight,
     required this.topOffset,
+    this.unitMinutes = 60,
   });
 
   final double timeColumnWidth;
@@ -136,6 +137,9 @@ class _GridBackground extends StatelessWidget {
   final double hourHeight;
   final double topOffset;
 
+  /// 左侧时间刻度的单位（分钟/格）。放大=更小(15/30/45)，缩小=更大(120/180…)。
+  final int unitMinutes;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -145,8 +149,9 @@ class _GridBackground extends StatelessWidget {
     final timeLabelColor = colors.onSurfaceVariant;
     final gridStep = gridMinutes.clamp(15, 60).toInt();
     final minuteHeight = hourHeight / 60;
-    final firstHour = (startMinute / 60).ceil();
-    final lastHour = (endMinute / 60).floor();
+    final unit = unitMinutes.clamp(5, 8 * 60).toInt();
+    final firstUnit = (startMinute / unit).ceil();
+    final lastUnit = (endMinute / unit).floor();
     return Stack(
       children: [
         Positioned.fill(
@@ -159,17 +164,18 @@ class _GridBackground extends StatelessWidget {
             ),
           ),
         ),
-        for (var hour = firstHour; hour <= lastHour; hour++)
+        for (var u = firstUnit; u <= lastUnit; u++)
           Positioned(
             left: timeColumnWidth,
             right: 0,
-            top: topOffset + (hour * 60 - startMinute) * minuteHeight,
+            top: topOffset + (u * unit - startMinute) * minuteHeight,
             child: Divider(height: 1, color: lineColor),
           ),
-        for (var hour = firstHour; hour <= lastHour; hour++)
+        for (var u = firstUnit; u <= lastUnit; u++)
           Positioned(
             left: 0,
-            top: topOffset + (hour * 60 - startMinute) * minuteHeight - 9,
+            top:
+                topOffset + (u * unit - startMinute) * minuteHeight - 9,
             width: timeColumnWidth,
             height: 18,
             child: Padding(
@@ -179,7 +185,7 @@ class _GridBackground extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    '${hour.toString().padLeft(2, '0')}:00',
+                    _unitLabel(u * unit),
                     textAlign: TextAlign.right,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: timeLabelColor,
@@ -191,7 +197,7 @@ class _GridBackground extends StatelessWidget {
             ),
           ),
         for (var minute = startMinute; minute < endMinute; minute += gridStep)
-          if (minute % 60 != 0)
+          if (minute % unit != 0)
             Positioned(
               left: timeColumnWidth,
               right: 0,
@@ -207,6 +213,13 @@ class _GridBackground extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  static String _unitLabel(int minute) {
+    final h = minute ~/ 60;
+    final m = minute % 60;
+    if (m == 0) return '${h.toString().padLeft(2, '0')}:00';
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
   }
 }
 
