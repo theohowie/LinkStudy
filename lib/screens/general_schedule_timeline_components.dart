@@ -306,10 +306,10 @@ class _OccurrenceCard extends StatelessWidget {
                 );
 
                 if (dense || narrow || !title.showDetails) {
-                  // 紧凑/窄屏也显示开始-结束时间（分三行：标题一行、开始时间、结束时间）。
-                  // 标题字号保持不变、单行省略号截断；时间字号小且完整显示
-                  //（FittedBox 只在列太窄时缩放时间行，不截断文本）；
-                  // 格子矮时内容超出部分裁剪，时间始终可见。
+                  // 紧凑/窄屏也显示开始-结束时间。
+                  // 格子宽度足够时时间一行展示（如日视图："19:00 - 19:40"）；
+                  // 列太窄（如周视图）时分行显示开始/结束时间；
+                  // 标题字号不变、单行省略号截断；格子矮时内容超出裁剪，时间始终可见。
                   return Align(
                     alignment: AlignmentDirectional.topStart,
                     child: LayoutBuilder(
@@ -329,14 +329,24 @@ class _OccurrenceCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: titleStyle,
                                 ),
-                                _CompactTimeLine(
-                                  text: _formatTime(occurrence.start),
-                                  style: detailStyle,
-                                ),
-                                _CompactTimeLine(
-                                  text: _formatTime(occurrence.end),
-                                  style: detailStyle,
-                                ),
+                                if (constraints.maxWidth >= 64)
+                                  _CompactTimeLine(
+                                    text: _formatOccurrenceTime(
+                                      context,
+                                      occurrence,
+                                    ),
+                                    style: detailStyle,
+                                  )
+                                else ...[
+                                  _CompactTimeLine(
+                                    text: _formatTime(occurrence.start),
+                                    style: detailStyle,
+                                  ),
+                                  _CompactTimeLine(
+                                    text: _formatTime(occurrence.end),
+                                    style: detailStyle,
+                                  ),
+                                ],
                               ],
                             ),
                           ),
