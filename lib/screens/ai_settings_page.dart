@@ -13,6 +13,9 @@ class AiScheduleSettingsPage extends StatefulWidget {
   State<AiScheduleSettingsPage> createState() => _AiScheduleSettingsPageState();
 }
 
+/// USD → CNY 参考汇率（用量统计金额换算用；仅作估算）。
+const double usdToCnyRate = 7.2;
+
 class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
   final _settings = AiScheduleSettings();
 
@@ -257,7 +260,8 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
-                      color: _testResult!.contains('超时') ||
+                      color:
+                          _testResult!.contains('超时') ||
                               _testResult!.contains('失败')
                           ? Theme.of(context).colorScheme.error
                           : Colors.green,
@@ -281,9 +285,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -297,7 +299,9 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                           children: [
                             for (final u in _usage)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -311,7 +315,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                                     const SizedBox(width: 8),
                                     Text(
                                       '${u.requests} 次 · ${u.totalTokens} tokens · '
-                                      '约 \$ ${estimateCostInUsd(u).toStringAsFixed(4)}',
+                                      '约 ￥${(estimateCostInUsd(u) * usdToCnyRate).toStringAsFixed(4)}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                   ],
@@ -321,7 +325,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                             Text(
                               '总计：${AiUsageStats.instance.totalRequests} 次 · '
                               '${AiUsageStats.instance.totalTokens} tokens · '
-                              '约 \$ ${AiUsageStats.instance.totalCostUsd.toStringAsFixed(4)}',
+                              '约 ￥${(AiUsageStats.instance.totalCostUsd * usdToCnyRate).toStringAsFixed(4)}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -332,7 +336,7 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  '费用为按模型公开定价估算，实际以平台账单为准。',
+                  '费用为按模型公开定价估算（1 USD ≈ 7.2 CNY），实际以平台账单为准。',
                   style: TextStyle(fontSize: 11, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
@@ -344,6 +348,16 @@ class _AiScheduleSettingsPageState extends State<AiScheduleSettingsPage> {
                     _provider == AiProvider.deepseek
                         ? '去 DeepSeek 创建 API Key'
                         : '去 OpenAI 创建 API Key',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // OpenAI API Key 直达链接（始终显示，方便在 DeepSeek 模式下也能直达）。
+                TextButton.icon(
+                  onPressed: () => _openApiKeyPage(AiProvider.openai),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('OpenAI API Key 直达链接'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ],
