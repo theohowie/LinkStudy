@@ -236,6 +236,7 @@ class _DayCalendarView extends StatefulWidget {
     required this.onEmptySlotTap,
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
+    this.onMoveCourse,
   });
 
   final DateTime date;
@@ -245,6 +246,12 @@ class _DayCalendarView extends StatefulWidget {
   final ValueChanged<DateTime> onEmptySlotTap;
   final ValueChanged<GeneralEventOccurrence> onOccurrenceTap;
   final ValueChanged<List<GeneralEventOccurrence>> onMoreOccurrencesTap;
+  final void Function(
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  )? onMoveCourse;
 
   @override
   State<_DayCalendarView> createState() => _DayCalendarViewState();
@@ -484,6 +491,7 @@ class _DayCalendarViewState extends State<_DayCalendarView> {
                 onEmptySlotTap: widget.onEmptySlotTap,
                 onOccurrenceTap: widget.onOccurrenceTap,
                 onMoreOccurrencesTap: widget.onMoreOccurrencesTap,
+                onMoveCourse: widget.onMoveCourse,
               );
             },
           ),
@@ -501,6 +509,7 @@ class _DayTimelinePage extends StatelessWidget {
     required this.onEmptySlotTap,
     required this.onOccurrenceTap,
     required this.onMoreOccurrencesTap,
+    this.onMoveCourse,
   });
 
   final DateTime date;
@@ -509,6 +518,12 @@ class _DayTimelinePage extends StatelessWidget {
   final ValueChanged<DateTime> onEmptySlotTap;
   final ValueChanged<GeneralEventOccurrence> onOccurrenceTap;
   final ValueChanged<List<GeneralEventOccurrence>> onMoreOccurrencesTap;
+  final void Function(
+    GeneralEventOccurrence occurrence,
+    DateTime targetDay,
+    int startMinute,
+    int deltaMinutes,
+  )? onMoveCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -530,6 +545,7 @@ class _DayTimelinePage extends StatelessWidget {
       onEmptySlotTap: onEmptySlotTap,
       onOccurrenceTap: onOccurrenceTap,
       onMoreOccurrencesTap: onMoreOccurrencesTap,
+      onMoveCourse: onMoveCourse,
     );
   }
 }

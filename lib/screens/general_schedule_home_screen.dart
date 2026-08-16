@@ -247,6 +247,19 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
                               provider,
                               occurrences,
                             ),
+                        onMoveCourse:
+                            (
+                              occurrence,
+                              targetDay,
+                              startMinute,
+                              deltaMinutes,
+                            ) => _moveLinkCourseSlot(
+                              context,
+                              occurrence,
+                              targetDay,
+                              startMinute,
+                              deltaMinutes,
+                            ),
                       ),
                       generalViewList => _ListCalendarView(
                         date: selectedDate,
