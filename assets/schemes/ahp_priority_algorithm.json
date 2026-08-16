@@ -1,0 +1,70 @@
+{
+  "schemeName": "ahp_priority_algorithm",
+  "schemeVersion": "1.0",
+  "algorithmName": "优先系数计算(AHP 层次分析法)",
+  "purpose": "计算每门课程的综合优先系数 P_i,用于决定排课顺序:优先系数越高,越优先获得好的时间片。",
+  "references": [
+    "AHP 层次分析法用于任务优先级排序(Com-DDPG 任务优先级模型, arXiv:2012.05105)",
+    "雷达资源调度中'重要性+紧急度'双因子优先级设计(arXiv:2409.19201)"
+  ],
+  "designIdea": "不用简单加权平均。先建立两两比较矩阵,让'难度'和'重要程度'两个因子互相比较得出权重,再由权重算出综合优先系数;最后叠加随截止日期临近而放大的紧迫度修正项。",
+  "inputs": {
+    "courses": [
+      {
+        "courseId": "string, 课程唯一标识",
+        "difficulty": "int, 1-9, 越大越难学",
+        "importance": "int, 1-9, 越大越重要",
+        "deadline_days": "int 或 null, 距截止日期剩余天数;null 表示无截止日期"
+      }
+    ],
+    "importanceOverDifficulty": "number, '重要程度'相对'难度'的支配强度 a12,默认 3(表示重要程度略强于难度)"
+  },
+  "outputs": {
+    "priorityCoefficients": {
+      "courseId": "string",
+      "P_i": "number, 综合优先系数, 范围 [0,1], 越大越优先"
+    }
+  },
+  "parameters": {
+    "a12_default": 3,
+    "w_urgency_base": 0.2,
+    "w_urgency_dynamic_amplifier": 3
+  },
+  "steps": [
+    {
+      "step": 1,
+      "name": "构建两两比较矩阵 A",
+      "detail": "比较'难度'与'重要程度'两个维度谁更该主导优先级。构造 2x2 矩阵:A = [[1, a12], [1/a12, 1]]。a12 由用户设置,未设置时取默认值 3。"
+    },
+    {
+      "step": 2,
+      "name": "求权重 w_difficulty, w_importance",
+      "detail": "求矩阵 A 的最大特征值对应的特征向量并归一化,得到权重 w_difficulty 与 w_importance。2x2 矩阵可直接用几何平均法简化计算,不必解特征值方程:w_importance = a12 / (a12 + 1); w_difficulty = 1 / (a12 + 1)。验证:二者之和恒为 1。"
+    },
+    {
+      "step": 3,
+      "name": "计算紧迫度因子 urgency_i",
+      "detail": "urgency_i = 1 / (deadline_days_i + 1)。无截止日期(deadline_days = null)时 urgency_i = 0。越接近截止日期,值越大。"
+    },
+    {
+      "step": 4,
+      "name": "归一化",
+      "detail": "对全部课程的 difficulty、importance、urgency 分别做集合内 min-max 归一化到 [0,1]:n_x = (x - min) / (max - min);若某属性所有课程取值相同(max == min),该属性归一化值取中性值 0.5。"
+    },
+    {
+      "step": 5,
+      "name": "动态紧迫度权重",
+      "detail": "w_urgency = w_urgency_base * (1 + w_urgency_dynamic_amplifier * n_urgency)。紧迫度越高(截止越近),w_urgency 越大,体现'时间偏差比'动态调整优先级的思路。"
+    },
+    {
+      "step": 6,
+      "name": "计算综合优先系数 P_i",
+      "detail": "P_i = (w_difficulty * n_difficulty_i + w_importance * n_importance_i + w_urgency * n_urgency_i) / (w_difficulty + w_importance + w_urgency)。分母归一化保证 P_i ∈ [0,1]。"
+    }
+  ],
+  "rules": [
+    "必须为每门课程计算 P_i,不得遗漏",
+    "P_i 计算必须按上述步骤与公式执行,不得改用简单加权平均",
+    "归一化必须在全部课程集合上进行,不能单独对单门课归一化"
+  ]
+}

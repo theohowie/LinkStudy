@@ -1,0 +1,81 @@
+{
+  "schemeName": "intensity_matching_algorithm",
+  "schemeVersion": "1.0",
+  "algorithmName": "强度档位与时间片的匹配规则",
+  "purpose": "把课程按用户选择的学习强度档位(轻松/中等/高强度)匹配到合适的时间片。三档强度不是简单的'时长长短'划分,而是分别对应不同的认知负荷承受能力和时间分布规律。",
+  "references": [
+    "认知负荷理论(高媛, 黄真真, 李冀红, 黄荣怀. 智慧学习环境中的认知负荷问题)",
+    "间隔学习效应(间隔学习研究综述; 间隔效应文献综述)",
+    "专注时长实证数据(微课教学应用讨论)"
+  ],
+  "designIdea": "三档强度分别对应不同的认知负荷承受能力和时间分布规律:高强度匹配专注力峰值时段且设单块与每日上限;中等按间隔重复规律分散;轻松作碎片填缝。",
+  "profiles": {
+    "high": {
+      "label": "高强度",
+      "description": "匹配用户专注力峰值时段(需用户自报或从历史完成数据学习,如 9-11 点);单次时间块时长设上限 T_max;每日高强度时段总量设硬上限 D_max,超出则该课程优先系数再高也要延后;匹配优先系数最高的课程。",
+      "T_max_minutes": 50,
+      "T_max_range": "建议 25-50 分钟区间,可配置",
+      "D_max_minutes": 90,
+      "prefer_peak_hours": true,
+      "spacing": "连续块,不间隔"
+    },
+    "medium": {
+      "label": "中等",
+      "description": "按'间隔重复'规律分布:同一门课不安排连续时间片,而是按 [1天, 2天, 4天...] 或用户自定义间隔周期分散到多个时间片;适合复习/巩固类任务。",
+      "T_max_minutes": 60,
+      "D_max_minutes": 150,
+      "prefer_peak_hours": false,
+      "spacing": {
+        "type": "interval_repetition",
+        "interval_days": [1, 2, 4],
+        "user_customizable": true
+      }
+    },
+    "light": {
+      "label": "轻松",
+      "description": "对时间连续性要求最低,可安排在碎片时间/低专注力时段;用于预习或低难度任务,作为'填缝'任务,优先使用零碎的可用时间片。",
+      "T_max_minutes": 45,
+      "D_max_minutes": 180,
+      "prefer_peak_hours": false,
+      "spacing": "碎片填缝,一次放满"
+    }
+  },
+  "inputs": {
+    "intensity_level": "string, 用户本次选择的学习强度档位: high | medium | light",
+    "peak_hours": [
+      {
+        "day_offset": "int",
+        "start": "int, 峰值时段开始(分钟)",
+        "end": "int, 峰值时段结束(分钟)"
+      }
+    ],
+    "courses_with_priority": [
+      {
+        "courseId": "string",
+        "P_i": "number, 算法一计算的优先系数",
+        "duration_minutes": "int, 课程时长"
+      }
+    ]
+  },
+  "outputs": {
+    "matched_slices": [
+      {
+        "courseId": "string",
+        "day_offset": "int",
+        "start": "int",
+        "end": "int",
+        "label": "string, 匹配的档位标签"
+      }
+    ]
+  },
+  "matching_rules": [
+    "高强度:优先匹配专注力峰值时段(peak_hours);单块时长不得超过 T_max;同一门课同一天累计时长不得超过 D_max;若该时段不足,先匹配优先系数最高的课程",
+    "中等:同一门课按间隔重复规律分散到多个时间片(间隔 1 天、2 天、4 天...或用户自定义),不安排连续时间片;适合复习/巩固类任务",
+    "轻松:对时间连续性要求最低,安排在碎片时间/低专注力时段;作为'填缝'任务,优先使用零碎的可用时间片"
+  ],
+  "rules": [
+    "必须严格使用用户选择的 intensity_level 对应的档位规则",
+    "三档强度不是'时长长短'划分,不得将轻松档简单地缩短时长、高强度档简单地加长时长",
+    "若用户未提供 peak_hours,高强度档退化为普通时间片(不强制峰值时段)"
+  ]
+}

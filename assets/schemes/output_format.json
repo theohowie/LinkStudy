@@ -1,0 +1,33 @@
+{
+  "schemeName": "output_format",
+  "schemeVersion": "1.0",
+  "algorithmName": "排课结果输出格式",
+  "purpose": "规定 AI 最终输出的排课结果 JSON 结构,保证软件可解析、可落位、可同步到课表网格。",
+  "output": {
+    "type": "json_object",
+    "schema": {
+      "order": [
+        {
+          "courseId": "string, 课程唯一标识(必须与输入课程清单一致)",
+          "difficulty": "int, 1-9, AI 评估的课程难度",
+          "importance": "int, 1-9, AI 评估的课程重要程度",
+          "priorityCoefficient": "number, 0-1, 算法一计算的优先系数 P_i",
+          "startDay": "int, 1=明天, 2=后天, 依此类推",
+          "startTime": "string, 'HH:MM' 24 小时制, 如 '09:00'",
+          "endTime": "string, 'HH:MM' 24 小时制, 如 '10:30'",
+          "restAfterMinutes": "int, 该课程之后的休息分钟数, 可为 0"
+        }
+      ],
+      "reason": "string, 一句话说明排课思路(排序依据、强度匹配、约束处理)"
+    }
+  },
+  "rules": [
+    "只输出上述 JSON 对象本身,禁止输出任何解释文字、Markdown 代码块标记或多余字段",
+    "order 数组必须包含全部输入课程,每门课恰好出现一次(courseId 唯一)",
+    "order 按 priorityCoefficient 降序排列",
+    "每门课的可排总时长必须等于或接近其课程时长(允许因时间片粒度产生的少量舍入)",
+    "所有 startTime/endTime 必须落在对应日期的可用时间片内,不得与任何不可用时间段(休息段、单次不可用时段)重叠",
+    "startTime 必须早于 endTime",
+    "difficulty、importance、priorityCoefficient 必须与算法一的计算结果一致"
+  ]
+}

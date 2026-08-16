@@ -48,6 +48,7 @@ flutter:
     - assets/default_period_times.json
     - assets/school_sites.json
     - assets/icons/
+    - assets/schemes/
     - NOTICE
 
 flutter_launcher_icons:

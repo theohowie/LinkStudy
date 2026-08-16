@@ -1,0 +1,59 @@
+{
+  "schemeName": "time_slices_algorithm",
+  "schemeVersion": "1.0",
+  "algorithmName": "可用时间片生成",
+  "purpose": "把用户设定的总时间范围切分成固定粒度的时间片数组,并用不可用时间做布尔'与'运算排除,得到课程唯一可被安排的时间片集合。",
+  "references": [
+    "自动排课算法的时间片'与运算'方法(纳米程序员博客园)",
+    "自动排课算法解析(CSDN)"
+  ],
+  "designIdea": "先把时间范围拆成固定粒度的时间片(初始全部标记为可用),再用不可用时间段做布尔'与'运算:被不可用时间覆盖的时间片标记为不可用,剩余的即为可用时间片。",
+  "inputs": {
+    "dayStart": "int, 每天可用时间窗开始(分钟, 0-1439, 如 9*60=540)",
+    "dayEnd": "int, 每天可用时间窗结束(分钟, 0-1440, 如 21*60=1260)",
+    "slot_size": "int, 时间片粒度(分钟), 默认 30",
+    "horizon_days": "int, 排课窗口天数(从明天起算)",
+    "blocked": [
+      {
+        "day_offset": "int, 相对排课起始日的偏移(0=明天, 1=后天...);null 或省略表示每天固定",
+        "start": "int, 不可用开始(分钟)",
+        "end": "int, 不可用结束(分钟)",
+        "reason": "string, 不可用原因(如'午休'、'打篮球'), 仅作说明"
+      }
+    ]
+  },
+  "outputs": {
+    "available_slots_by_day": {
+      "day_offset": "int",
+      "slices": [
+        {
+          "start": "int, 时间片开始(分钟)",
+          "end": "int, 时间片结束(分钟)",
+          "label": "string, 强度适配标签(由算法三/四标注,初始为空)"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step": 1,
+      "name": "切分时间片",
+      "detail": "对每个排课日(day_offset = 0..horizon_days-1),把 [dayStart, dayEnd) 按 slot_size 切分成 N 个连续时间片,初始状态全部标记为可用(1)。最后一个不完整片(不足 slot_size)丢弃。"
+    },
+    {
+      "step": 2,
+      "name": "不可用时间排除(布尔'与'运算)",
+      "detail": "遍历 blocked[] 中的每个不可用时间段:若其 day_offset 与当前日匹配(或为每天固定),找到该时间段覆盖的时间片下标区间 [floor((start-dayStart)/slot_size), ceil((end-dayStart)/slot_size)),将区间内所有时间片标记为不可用(0)。边界重叠的时间片只要被部分覆盖即标记为不可用。"
+    },
+    {
+      "step": 3,
+      "name": "输出可用时间片",
+      "detail": "对每个排课日,筛选出仍标记为 1 的时间片,按时间顺序排列,作为该日 available_slices。即'最大可安排时间数组'与'已占用时间数组'做与运算后的结果。"
+    }
+  ],
+  "rules": [
+    "课程只能被安排到 available_slices 内,任何时间片之外的时间(含被 blocked 覆盖的)一律不可排",
+    "时间片按时间升序排列",
+    "horizon_days 内的每一天都要生成对应的可用时间片列表,即使某天完全被 blocked 覆盖也要输出空列表"
+  ]
+}

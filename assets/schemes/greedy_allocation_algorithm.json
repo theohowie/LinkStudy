@@ -1,0 +1,66 @@
+{
+  "schemeName": "greedy_allocation_algorithm",
+  "schemeVersion": "1.0",
+  "algorithmName": "贪心分配调度算法(主流程)",
+  "purpose": "按优先系数降序依次为每门课匹配'最符合其强度档位要求'的可用时间片,生成最终排课方案。是背包问题的简化贪心版本。",
+  "references": [
+    "云计算价值密度调度算法 LLVDF(Science.gov 综述)",
+    "边缘计算加权优先级队列调度 DPTARA(ScienceDirect)"
+  ],
+  "designIdea": "先按优先系数降序排序课程,再依次为每门课匹配'最符合其强度档位要求'的可用时间片;候选时间片不足时降级匹配次优标签;分配后移除已占用时间片。",
+  "inputs": {
+    "courses": [
+      {
+        "courseId": "string",
+        "duration_minutes": "int",
+        "P_i": "number, 算法一计算的优先系数",
+        "intensity_level": "string, 算法三使用的档位 high|medium|light"
+      }
+    ],
+    "available_slots_by_day": "算法二的输出:每天带强度标签的可用时间片列表"
+  },
+  "outputs": {
+    "schedule": [
+      {
+        "courseId": "string",
+        "day_offset": "int, 相对排课起始日的偏移(0=明天)",
+        "start": "int, 开始(分钟)",
+        "end": "int, 结束(分钟)"
+      }
+    ],
+    "failures": [
+      {
+        "courseId": "string",
+        "reason": "string, 未能安排的原因"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "name": "课程排序",
+      "detail": "将 courses[] 按优先系数 P_i 降序排序。优先系数相同的时间先录入的先排。"
+    },
+    {
+      "step": 2,
+      "name": "时间片打标签",
+      "detail": "将 available_slots_by_day 中的时间片按强度适配性分类打标签:例如用户历史数据显示 9-11 点专注力高,则将该时段时间片标记为'高强度可用时段';其余按默认档位标记。"
+    },
+    {
+      "step": 3,
+      "name": "逐课贪心分配",
+      "detail": "for course in sorted(courses):\n  1) 目标强度档 = course.intensity_level;\n  2) 候选时间片 = 标签匹配目标强度档的时间片;\n  3) 若候选时间片为空,降级匹配次优标签的时间片(如高强度课程找不到高强度时段,退而求其次找中等时段);\n  4) 从候选时间片中选出与 course 所需时长最匹配的连续/间隔时间片:高强度→选连续块;中等强度→按算法三的间隔规律分散选取;\n  5) 分配后,从 available_slots 中移除已占用的时间片;\n  6) 记录到 schedule[]。"
+    },
+    {
+      "step": 4,
+      "name": "未分配课程处理",
+      "detail": "若仍有课程未能完全分配(可用时间片不足):按优先系数从低到高依次裁剪(即先放弃低优先课程),或提示用户当前时间范围不足。被放弃的课程写入 failures[] 并附原因。"
+    }
+  ],
+  "rules": [
+    "必须按 P_i 降序分配,高优先课程优先获得最佳时间片",
+    "高强度课程找不到高强度时段时,允许降级匹配次优标签,但不允许匹配到已被占用的时间片",
+    "每门课分配后必须从可用时间片中移除已占用部分,不得重复分配同一时间片",
+    "时间不足时,从优先系数最低的课程开始放弃,并在 failures[] 中说明原因"
+  ]
+}
