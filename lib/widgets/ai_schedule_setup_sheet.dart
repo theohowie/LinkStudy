@@ -246,26 +246,63 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
       title: const Text('AI 智能排课'),
       subtitle: const Text('告诉 AI 你的学习节奏，剩下的交给它'),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(_scheduling ? '退出（后台继续）' : '取消'),
-        ),
-        FilledButton(
-          onPressed: _scheduling ? _openProgress : _run,
-          child: _scheduling
-              ? const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 8),
-                    Text('排课中…'),
-                  ],
-                )
-              : const Text('开始 AI 排课'),
+        // 监听排课任务状态：排课中显示"退出+排课中…"；完成后只显示"关闭"。
+        AnimatedBuilder(
+          animation: AiScheduleRunner.instance,
+          builder: (context, child) {
+            final task = AiScheduleRunner.instance.task;
+            final running =
+                _scheduling &&
+                (task == null ||
+                    task.phase == AiSchedulePhase.requestingAi ||
+                    task.phase == AiSchedulePhase.placing);
+            final finished =
+                _scheduling &&
+                task != null &&
+                (task.phase == AiSchedulePhase.done ||
+                    task.phase == AiSchedulePhase.failed);
+            if (finished) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('关闭'),
+                  ),
+                ],
+              );
+            }
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(running ? '退出（后台继续）' : '取消'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: running ? _openProgress : _run,
+                  child: running
+                      ? const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Text('排课中…'),
+                          ],
+                        )
+                      : const Text('开始 AI 排课'),
+                ),
+              ],
+            );
+          },
         ),
       ],
       child: _scheduling
