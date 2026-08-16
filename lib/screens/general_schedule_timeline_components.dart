@@ -306,9 +306,9 @@ class _OccurrenceCard extends StatelessWidget {
                 );
 
                 if (dense || narrow || !title.showDetails) {
-                  // 紧凑/窄屏也显示开始-结束时间（分两行：标题一行、时间一行）。
-                  // 标题字号保持不变、单行省略号截断；时间字号调小且完整显示
-                  //（FittedBox 只在列太窄时整体缩小时间行，不截断文本）；
+                  // 紧凑/窄屏也显示开始-结束时间（分三行：标题一行、开始时间、结束时间）。
+                  // 标题字号保持不变、单行省略号截断；时间字号小且完整显示
+                  //（FittedBox 只在列太窄时缩放时间行，不截断文本）；
                   // 格子矮时内容超出部分裁剪，时间始终可见。
                   return Align(
                     alignment: AlignmentDirectional.topStart,
@@ -329,15 +329,13 @@ class _OccurrenceCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: titleStyle,
                                 ),
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: AlignmentDirectional.centerStart,
-                                  child: Text(
-                                    _formatOccurrenceTime(context, occurrence),
-                                    maxLines: 1,
-                                    style:
-                                        detailStyle?.copyWith(fontSize: 10),
-                                  ),
+                                _CompactTimeLine(
+                                  text: _formatTime(occurrence.start),
+                                  style: detailStyle,
+                                ),
+                                _CompactTimeLine(
+                                  text: _formatTime(occurrence.end),
+                                  style: detailStyle,
                                 ),
                               ],
                             ),
@@ -571,4 +569,25 @@ double _contrastRatio(Color a, Color b) {
   final lighter = math.max(aLuminance, bLuminance);
   final darker = math.min(aLuminance, bLuminance);
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+/// 紧凑时间行：小字号（10px），列太窄时缩放保证完整显示（不截断）。
+class _CompactTimeLine extends StatelessWidget {
+  const _CompactTimeLine({required this.text, required this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
+        text,
+        maxLines: 1,
+        style: style?.copyWith(fontSize: 10, height: 1.1),
+      ),
+    );
+  }
 }
