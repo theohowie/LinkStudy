@@ -75,30 +75,10 @@ class AiScheduleConversation extends StatelessWidget {
     );
   }
 
-  /// 用户侧气泡：排课请求摘要（像发出的一条聊天消息）。
+  /// 用户侧气泡：软件发给 AI 的指令（像发出的一条聊天消息）。
   Widget _userBubble(BuildContext context, AiScheduleTask task) {
     final theme = Theme.of(context);
-    final prefs = task.prefs;
-    final intensityLabel = switch (prefs.intensity) {
-      StudyIntensity.relaxed => '轻松',
-      StudyIntensity.medium => '中等',
-      StudyIntensity.stressed => '压力',
-    };
-    final startLabel = prefs.startMode == ScheduleStartMode.now
-        ? '从现在开始'
-        : '从明天开始';
-    final notes = prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim();
-    final preference = prefs.timePreference.trim().isEmpty
-        ? '全天'
-        : prefs.timePreference.trim();
-    final courseTitles = [
-      for (final id in task.courseIds)
-        if (store.courseById(id) case final c?) c.title,
-    ];
-    final titles = courseTitles.isEmpty
-        ? '${task.courseIds.length} 门课程'
-        : courseTitles.take(3).join('、') +
-              (courseTitles.length > 3 ? ' 等 ${courseTitles.length} 门' : '');
+    final count = task.courseIds.length;
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -116,9 +96,7 @@ class AiScheduleConversation extends StatelessWidget {
           ),
         ),
         child: Text(
-          '帮我排课：$titles\n'
-          '强度：$intensityLabel · $startLabel · 计划 ${prefs.days} 天\n'
-          '备注：$notes · 偏好：$preference',
+          '请使用软件技能为这 $count 节课进行排序,注意用户的要求设置。',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onPrimaryContainer,
             height: 1.45,

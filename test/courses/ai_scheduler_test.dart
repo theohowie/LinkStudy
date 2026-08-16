@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:linkstudy/courses/ai_scheduler.dart';
+import 'package:linkstudy/courses/ai_skill_package.dart';
 import 'package:linkstudy/courses/link_course.dart';
 import 'package:linkstudy/services/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,20 +43,23 @@ class _FakeSecretStore implements SecretStore {
 }
 
 LinkCourse _course(String id, {int duration = 40}) => LinkCourse(
-      id: id,
-      url: 'https://example.com/$id',
-      title: '课程$id',
-      durationMinutes: duration,
-      createdAt: DateTime(2026, 1, 5),
-    );
+  id: id,
+  url: 'https://example.com/$id',
+  title: '课程$id',
+  durationMinutes: duration,
+  createdAt: DateTime(2026, 1, 5),
+);
 
-AiScheduleConfig _config({String apiKey = 'sk-test'}) => AiScheduleConfig(
-      provider: AiProvider.deepseek,
-      baseUrl: 'https://api.deepseek.com/v1',
-      apiKey: apiKey,
-      model: 'deepseek-chat',
-      windowDescription: '08:00-12:00 与 13:00-23:00',
-    );
+AiScheduleConfig _config({
+  String apiKey = 'sk-test',
+  String windowDescription = '08:00-12:00 与 13:00-23:00',
+}) => AiScheduleConfig(
+  provider: AiProvider.deepseek,
+  baseUrl: 'https://api.deepseek.com/v1',
+  apiKey: apiKey,
+  model: 'deepseek-chat',
+  windowDescription: windowDescription,
+);
 
 void main() {
   setUp(() {
@@ -140,9 +144,7 @@ void main() {
           jsonEncode({
             'choices': [
               {
-                'message': {
-                  'content': '```json\n[{"courseId":"a"}]\n```',
-                },
+                'message': {'content': '```json\n[{"courseId":"a"}]\n```'},
               },
             ],
           }),
@@ -169,7 +171,8 @@ void main() {
             'choices': [
               {
                 'message': {
-                  'content': '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
                 },
               },
             ],
@@ -199,6 +202,114 @@ void main() {
       expect(body['model'], 'deepseek-chat');
     });
 
+    test('技能包模式：三段式消息（system + 技能文件 + 填充后的请求）', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      final skillPackage = AiSkillPackage(
+        systemPrompt: '# 排课技能系统提示词\n请读取技能文件执行。',
+        userTemplate: [
+          '请使用软件技能为这 {{course_count}} 节课进行排序,注意用户的要求设置。',
+          '## 课程清单',
+          '{{course_rows}}',
+          '## 用户要求设置',
+          '- **学习强度**:{{intensity_label}}({{intensity_key}})',
+          '- **排课窗口**:从{{start_label}}开始,共 {{days}} 天',
+          '- **每日可用时间窗**:{{window_description}}',
+          '- **每日固定休息段**:{{fixed_breaks}}',
+          '- **单次不可用时段**:{{one_off_blocks}}',
+          '- **备注**:{{notes}}',
+        ].join('\n'),
+        schemeFiles: {
+          'ahp_priority_algorithm.json': '{"algorithm":"ahp"}',
+          'output_format.json': '{"schema":"order"}',
+        },
+      );
+      await AiScheduler(client: client).schedule(
+        courses: [_course('a', duration: 60)],
+        prefs: const AiSchedulePrefs(
+          intensity: StudyIntensity.medium,
+          days: 3,
+          notes: '周一下午有课',
+        ),
+        config: _config(),
+        localeCode: 'zh-CN',
+        skillPackage: skillPackage,
+      );
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      expect(messages, hasLength(3), reason: '技能包模式应为三段式消息');
+
+      final system = messages[0]['content'] as String;
+      expect(system, contains('请读取技能文件执行'));
+
+      final scheme = messages[1]['content'] as String;
+      expect(scheme, contains('ahp_priority_algorithm.json'));
+      expect(scheme, contains('{"algorithm":"ahp"}'));
+      expect(scheme, contains('output_format.json'));
+
+      final user = messages[2]['content'] as String;
+      expect(user, contains('请使用软件技能为这 1 节课进行排序'));
+      expect(user, contains('| a | 课程a | 60 |'));
+      expect(user, contains('中等'));
+      expect(user, contains('medium'));
+      expect(user, contains('从现在开始'));
+      expect(user, contains('共 3 天'));
+      expect(user, contains('08:00-12:00 与 13:00-23:00'));
+      // 时间窗两段之间的休息段被推导为固定休息段。
+      expect(user, contains('12:00-13:00'));
+      expect(user, contains('周一下午有课'));
+    });
+
+    test('技能包模式：固定休息段从时间窗推导，单段时间窗为无', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":0}],"reason":"x"}',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      const skillPackage = AiSkillPackage(
+        systemPrompt: 'sys',
+        userTemplate: '{{fixed_breaks}}|{{notes}}',
+        schemeFiles: const {},
+      );
+      await AiScheduler(client: client).schedule(
+        courses: [_course('a')],
+        prefs: const AiSchedulePrefs(),
+        config: _config(windowDescription: '09:00-18:00'),
+        localeCode: 'zh-CN',
+        skillPackage: skillPackage,
+      );
+      final body = jsonDecode(capturedBody!) as Map<String, dynamic>;
+      final user = (body['messages'] as List<dynamic>)[2]['content'] as String;
+      expect(user, '无|无');
+    });
+
     test('请求体保持精简（MTU 黑洞环境下大请求会被丢）', () async {
       String? capturedBody;
       final client = MockClient((request) async {
@@ -208,7 +319,8 @@ void main() {
             'choices': [
               {
                 'message': {
-                  'content': '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
+                  'content':
+                      '{"order":[{"courseId":"a","restAfterMinutes":10}],"reason":"x"}',
                 },
               },
             ],
@@ -217,8 +329,7 @@ void main() {
         );
       });
       final courses = [
-        for (var i = 0; i < 5; i++)
-          _course('course_$i', duration: 40 + i * 10),
+        for (var i = 0; i < 5; i++) _course('course_$i', duration: 40 + i * 10),
       ];
       await AiScheduler(client: client).schedule(
         courses: courses,
@@ -341,7 +452,9 @@ void main() {
         return http.Response(
           jsonEncode({
             'choices': [
-              {'message': {'content': '我不是 JSON'}},
+              {
+                'message': {'content': '我不是 JSON'},
+              },
             ],
           }),
           200,
@@ -363,7 +476,9 @@ void main() {
         return http.Response(
           jsonEncode({
             'choices': [
-              {'message': {'content': '{"order":[],"reason":"没有课程"}'}},
+              {
+                'message': {'content': '{"order":[],"reason":"没有课程"}'},
+              },
             ],
           }),
           200,
@@ -457,8 +572,7 @@ void main() {
       );
       final entries = AiUsageStats.instance.entries;
       expect(entries, hasLength(2));
-      final flash =
-          entries.singleWhere((e) => e.model == 'deepseek-v4-flash');
+      final flash = entries.singleWhere((e) => e.model == 'deepseek-v4-flash');
       expect(flash.requests, 2);
       expect(flash.promptTokens, 300);
       expect(flash.completionTokens, 150);

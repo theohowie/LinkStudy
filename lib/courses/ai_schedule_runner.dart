@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../platform/overlay_client.dart';
 import '../services/notification_service.dart';
 import 'ai_scheduler.dart';
+import 'ai_skill_package.dart';
 import 'link_course.dart';
 import 'scheduler_engine.dart';
 
@@ -96,6 +97,7 @@ class AiScheduleRunner extends ChangeNotifier {
     LinkCourseStore? store,
     AiScheduleSettings? settings,
     NotificationService? notifications,
+    Future<AiSkillPackage?> Function()? skillLoader,
     Duration timeout = const Duration(seconds: 600),
   }) async {
     if (isRunning) return;
@@ -144,23 +146,30 @@ class AiScheduleRunner extends ChangeNotifier {
       task.phase = AiSchedulePhase.requestingAi;
       notifyListeners();
 
+      // 加载排课技能文件包（md 提示词 + 算法 JSON）；加载失败时降级内置 prompt。
+      final skillPackage =
+          await (skillLoader ?? const AiSkillPackageLoader().load)();
+
       final outcome = await (scheduler ?? AiScheduler()).schedule(
         courses: courses,
         prefs: prefs,
         config: requestConfig,
         localeCode: localeCode,
+        skillPackage: skillPackage,
         onToken: (delta) {
           task.thinking += delta;
           notifyListeners();
         },
         onUsage: (prompt, completion) {
           // 记录 token 用量（按 provider+model 累计）。
-          unawaited(AiUsageStats.instance.record(
-            provider: config.provider,
-            model: config.model,
-            promptTokens: prompt,
-            completionTokens: completion,
-          ));
+          unawaited(
+            AiUsageStats.instance.record(
+              provider: config.provider,
+              model: config.model,
+              promptTokens: prompt,
+              completionTokens: completion,
+            ),
+          );
         },
       );
 
@@ -185,8 +194,9 @@ class AiScheduleRunner extends ChangeNotifier {
           task.failureCount = result.failures.length;
           task.phase = AiSchedulePhase.done;
           notifyListeners();
-          final failNote =
-              task.failureCount == 0 ? '' : '，${task.failureCount} 门未能排上';
+          final failNote = task.failureCount == 0
+              ? ''
+              : '，${task.failureCount} 门未能排上';
           await notifier.showScheduleResult(
             success: true,
             message: '${task.placedCount} 门已安排$failNote，点击查看排课详情',

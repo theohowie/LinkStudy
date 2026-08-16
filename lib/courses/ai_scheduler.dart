@@ -8,6 +8,7 @@ import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/secret_store.dart';
+import 'ai_skill_package.dart';
 import 'link_course.dart';
 import 'scheduler_engine.dart';
 
@@ -193,11 +194,15 @@ class AiScheduler {
   ///
   /// [onToken] 非空时启用流式输出（SSE），AI 生成的文本逐块回调（思考过程实时可见）。
   /// [onUsage] 请求完成后回调 token 用量（prompt/completion），用于用量统计。
+  /// [skillPackage] 可选：排课技能文件包（md 提示词 + 算法 JSON）。提供时消息改为
+  /// 三段式（system=技能系统提示词 / user=技能文件内容 / user=填充后的排课请求）；
+  /// 不提供时回退内置精简 prompt（降级路径）。
   Future<AiScheduleOutcome> schedule({
     required List<LinkCourse> courses,
     required AiSchedulePrefs prefs,
     required AiScheduleConfig config,
     required String localeCode,
+    AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
   }) async {
@@ -227,18 +232,13 @@ class AiScheduler {
         'model': config.model.trim(),
         'temperature': 0.3,
         if (onToken != null) 'stream': true,
-        'messages': [
-          {'role': 'system', 'content': aiScheduleSystemPrompt},
-          {
-            'role': 'user',
-            'content': _buildUserPrompt(
-              courses: courses,
-              prefs: prefs,
-              window: config.windowDescription,
-              localeCode: localeCode,
-            ),
-          },
-        ],
+        'messages': _buildMessages(
+          courses: courses,
+          prefs: prefs,
+          config: config,
+          localeCode: localeCode,
+          skillPackage: skillPackage,
+        ),
       });
 
     final http.StreamedResponse streamed;
@@ -493,6 +493,131 @@ class AiScheduler {
       stopwatch.stop();
       return '失败：$e';
     }
+  }
+
+  /// 组装发给 AI 的 messages：
+  /// - 提供 [skillPackage]：三段式（system=技能系统提示词；user=技能文件内容；user=填充后的排课请求）；
+  /// - 未提供：回退内置精简 prompt（system + user 两段）。
+  List<Map<String, String>> _buildMessages({
+    required List<LinkCourse> courses,
+    required AiSchedulePrefs prefs,
+    required AiScheduleConfig config,
+    required String localeCode,
+    AiSkillPackage? skillPackage,
+  }) {
+    if (skillPackage != null) {
+      final schemeContent = [
+        for (final e in skillPackage.schemeFiles.entries)
+          '### ${e.key}\n${e.value}',
+      ].join('\n\n');
+      return [
+        {'role': 'system', 'content': skillPackage.systemPrompt},
+        {
+          'role': 'user',
+          'content': '以下是本次排课需要使用的算法方案文件,请先读取再执行:\n\n$schemeContent',
+        },
+        {
+          'role': 'user',
+          'content': _fillUserTemplate(
+            template: skillPackage.userTemplate,
+            courses: courses,
+            prefs: prefs,
+            window: config.windowDescription,
+            localeCode: localeCode,
+          ),
+        },
+      ];
+    }
+    return [
+      {'role': 'system', 'content': aiScheduleSystemPrompt},
+      {
+        'role': 'user',
+        'content': _buildUserPrompt(
+          courses: courses,
+          prefs: prefs,
+          window: config.windowDescription,
+          localeCode: localeCode,
+        ),
+      },
+    ];
+  }
+
+  /// 用本次排课数据填充 [user_prompt.md] 模板的 `{{占位符}}`。
+  /// 占位符：{{course_count}} {{course_rows}} {{intensity_label}} {{intensity_key}}
+  /// {{start_label}} {{days}} {{window_description}} {{fixed_breaks}} {{one_off_blocks}} {{notes}}
+  String _fillUserTemplate({
+    required String template,
+    required List<LinkCourse> courses,
+    required AiSchedulePrefs prefs,
+    required String window,
+    required String localeCode,
+  }) {
+    final intensityLabel = switch (prefs.intensity) {
+      StudyIntensity.relaxed => '轻松',
+      StudyIntensity.medium => '中等',
+      StudyIntensity.stressed => '压力',
+    };
+    final intensityKey = switch (prefs.intensity) {
+      StudyIntensity.relaxed => 'light',
+      StudyIntensity.medium => 'medium',
+      StudyIntensity.stressed => 'high',
+    };
+    final startLabel = prefs.startMode == ScheduleStartMode.now ? '现在' : '明天';
+    final rows = [
+      for (final c in courses)
+        '| ${c.id} | ${c.title} | ${c.durationMinutes} |',
+    ].join('\n');
+    // 从时间窗描述推导固定休息段（如 "08:00-12:00 与 13:00-23:00" → "12:00-13:00"）。
+    final fixedBreaks = _fixedBreakFromWindow(window);
+    return template
+        .replaceAll('{{course_count}}', '${courses.length}')
+        .replaceAll('{{course_rows}}', rows)
+        .replaceAll('{{intensity_label}}', intensityLabel)
+        .replaceAll('{{intensity_key}}', intensityKey)
+        .replaceAll('{{start_label}}', startLabel)
+        .replaceAll('{{days}}', '${prefs.days}')
+        .replaceAll('{{window_description}}', window)
+        .replaceAll('{{fixed_breaks}}', fixedBreaks)
+        .replaceAll(
+          '{{one_off_blocks}}',
+          prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim(),
+        )
+        .replaceAll(
+          '{{notes}}',
+          prefs.notes.trim().isEmpty ? '无' : prefs.notes.trim(),
+        );
+  }
+
+  /// 从时间窗描述提取相邻时段之间的休息段；无法解析时返回"无"。
+  static String _fixedBreakFromWindow(String window) {
+    final parts = window
+        .split(RegExp(r'\s*与\s*|\s*,\s*|\s*;\s*'))
+        .where((s) => s.trim().isNotEmpty)
+        .toList();
+    if (parts.length < 2) return '无';
+    final ranges = <(int, int)>[];
+    for (final p in parts) {
+      final m = RegExp(r'(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})').firstMatch(p);
+      if (m == null) return '无';
+      ranges.add((
+        int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!),
+        int.parse(m.group(3)!) * 60 + int.parse(m.group(4)!),
+      ));
+    }
+    ranges.sort((a, b) => a.$1.compareTo(b.$1));
+    final breaks = <String>[];
+    for (var i = 1; i < ranges.length; i++) {
+      if (ranges[i].$1 > ranges[i - 1].$2) {
+        breaks.add('${_hhmm(ranges[i - 1].$2)}-${_hhmm(ranges[i].$1)}');
+      }
+    }
+    return breaks.isEmpty ? '无' : breaks.join(' 与 ');
+  }
+
+  static String _hhmm(int minute) {
+    final h = (minute ~/ 60).toString().padLeft(2, '0');
+    final m = (minute % 60).toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   String _buildUserPrompt({

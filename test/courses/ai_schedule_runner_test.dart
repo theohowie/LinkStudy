@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linkstudy/courses/ai_schedule_runner.dart';
 import 'package:linkstudy/courses/ai_scheduler.dart';
+import 'package:linkstudy/courses/ai_skill_package.dart';
 import 'package:linkstudy/courses/link_course.dart';
 import 'package:linkstudy/services/notification_service.dart';
 import 'package:linkstudy/widgets/ai_schedule_progress_sheet.dart';
@@ -21,6 +22,7 @@ class _FakeScheduler extends AiScheduler {
     required AiSchedulePrefs prefs,
     required AiScheduleConfig config,
     required String localeCode,
+    AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
   }) async {
@@ -46,6 +48,7 @@ class _StreamingScheduler extends AiScheduler {
     required AiSchedulePrefs prefs,
     required AiScheduleConfig config,
     required String localeCode,
+    AiSkillPackage? skillPackage,
     void Function(String delta)? onToken,
     void Function(int promptTokens, int completionTokens)? onUsage,
   }) async {
@@ -84,10 +87,10 @@ void main() {
   );
 
   Future<LinkCourse> addCourse(String id) => LinkCourseStore.instance.addCourse(
-        url: 'https://example.com/$id',
-        title: '课程$id',
-        durationMinutes: 40,
-      );
+    url: 'https://example.com/$id',
+    title: '课程$id',
+    durationMinutes: 40,
+  );
 
   test('成功路径：任务完成、课程落位、状态更新', () async {
     final store = LinkCourseStore.instance;
@@ -100,6 +103,7 @@ void main() {
       availability: availability,
       windowDescription: '08:00-12:00 与 13:00-22:00',
       localeCode: 'zh-CN',
+      skillLoader: () async => null,
       scheduler: _FakeScheduler(
         const AiScheduleOutcomeSuccess(
           AiScheduleSuccess(
@@ -134,12 +138,10 @@ void main() {
       availability: availability,
       windowDescription: '08:00-12:00 与 13:00-22:00',
       localeCode: 'zh-CN',
+      skillLoader: () async => null,
       scheduler: _FakeScheduler(
         const AiScheduleOutcomeError(
-          AiScheduleError(
-            type: AiScheduleErrorType.network,
-            message: '网络连接失败',
-          ),
+          AiScheduleError(type: AiScheduleErrorType.network, message: '网络连接失败'),
         ),
       ),
     );
@@ -162,6 +164,7 @@ void main() {
       availability: availability,
       windowDescription: '08:00-12:00 与 13:00-22:00',
       localeCode: 'zh-CN',
+      skillLoader: () async => null,
       scheduler: _FakeScheduler(
         const AiScheduleOutcomeSuccess(
           AiScheduleSuccess(
@@ -202,6 +205,7 @@ void main() {
       availability: availability,
       windowDescription: '08:00-12:00 与 13:00-22:00',
       localeCode: 'zh-CN',
+      skillLoader: () async => null,
       scheduler: scheduler,
     );
 
@@ -218,8 +222,8 @@ void main() {
     );
     await tester.pump();
 
-    // 排课中：展示用户请求气泡 + AI 思考占位。
-    expect(find.textContaining('帮我排课'), findsOneWidget);
+    // 排课中：展示用户请求气泡（软件发给 AI 的短指令）+ AI 思考占位。
+    expect(find.textContaining('请使用软件技能为这 2 节课进行排序'), findsOneWidget);
     expect(find.textContaining('正在思考排课方案'), findsOneWidget);
 
     // 等待 schedule() 注册 onToken，确保 emit 生效。
