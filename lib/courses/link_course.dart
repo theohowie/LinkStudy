@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/general_models.dart';
 import 'scheduler_engine.dart';
 
 /// 课程优先级。
@@ -60,33 +61,42 @@ DateTime localDateFromEpochDay(int day) {
   return DateTime(utc.year, utc.month, utc.day);
 }
 
-/// 从通用显示设置（开始/午休/结束时间，分钟级）构建每天的学习可用时段（7 天相同）。
-/// 时段 = [开始, 午休开始) + [午休结束, 结束)；午休无效时退化为 [开始, 结束)；
-/// 全部无效时回退默认 19:00-22:00。
+/// 从通用显示设置（开始/结束时间 + 固定不可安排时间段，分钟级）构建每天的学习可用时段
+/// （7 天相同）。时段 = [开始, 结束) 减去所有固定时间段（午饭/午休/晚饭等）；
+/// 无可用时段时回退默认 19:00-22:00。
 List<List<AvailabilitySlot>> availabilityFromDayWindow({
   required int startMinute,
-  required int lunchStartMinute,
-  required int lunchEndMinute,
   required int endMinute,
+  required List<GeneralFixedBlock> blocks,
 }) {
-  final morningStart = startMinute.clamp(0, 24 * 60 - 1);
-  final lunchStart = lunchStartMinute.clamp(0, 24 * 60);
-  final lunchEnd = lunchEndMinute.clamp(0, 24 * 60);
-  final eveningEnd = endMinute.clamp(1, 24 * 60);
+  final windowStart = startMinute.clamp(0, 24 * 60 - 1);
+  final windowEnd = endMinute.clamp(1, 24 * 60);
 
   final slots = <AvailabilitySlot>[];
-  if (lunchStart > morningStart) {
-    slots.add(
-      AvailabilitySlot(startMinute: morningStart, endMinute: lunchStart),
-    );
+  final sorted = [...blocks]
+    ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+  var cursor = windowStart;
+  for (final block in sorted) {
+    if (block.endMinute <= windowStart || block.startMinute >= windowEnd) {
+      continue; // 完全在窗口外，忽略。
+    }
+    if (block.endMinute <= cursor) {
+      continue; // 已被前一个时段覆盖。
+    }
+    final blockStart = block.startMinute.clamp(windowStart, windowEnd);
+    if (blockStart > cursor) {
+      slots.add(
+        AvailabilitySlot(startMinute: cursor, endMinute: blockStart),
+      );
+    }
+    final blockEnd = block.endMinute.clamp(windowStart, windowEnd);
+    if (blockEnd > cursor) {
+      cursor = blockEnd;
+    }
+    if (cursor >= windowEnd) break;
   }
-  if (eveningEnd > lunchEnd) {
-    slots.add(AvailabilitySlot(startMinute: lunchEnd, endMinute: eveningEnd));
-  }
-  if (slots.isEmpty && eveningEnd > morningStart) {
-    slots.add(
-      AvailabilitySlot(startMinute: morningStart, endMinute: eveningEnd),
-    );
+  if (cursor < windowEnd) {
+    slots.add(AvailabilitySlot(startMinute: cursor, endMinute: windowEnd));
   }
   return List.generate(
     7,

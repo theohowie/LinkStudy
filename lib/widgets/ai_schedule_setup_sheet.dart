@@ -114,9 +114,8 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
     }
     return availabilityFromDayWindow(
       startMinute: provider.generalDayStartMinute,
-      lunchStartMinute: provider.generalLunchStartMinute,
-      lunchEndMinute: provider.generalLunchEndMinute,
       endMinute: provider.generalDayEndMinute,
+      blocks: provider.generalFixedBlocks,
     );
   }
 
@@ -184,13 +183,13 @@ class _AiScheduleSetupSheetState extends State<AiScheduleSetupSheet> {
     );
     if (occurrences.isEmpty) return '';
     final lines = <String>[];
+    String hhmm(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
     for (final o in occurrences) {
       if (o.isAllDay) {
         lines.add('${o.start.month}月${o.start.day}日 全天:${o.event.title}');
         continue;
       }
-      final hhmm = (DateTime d) =>
-          '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
       lines.add(
         '${o.start.month}月${o.start.day}日 ${hhmm(o.start)}-${hhmm(o.end)}:${o.event.title}',
       );

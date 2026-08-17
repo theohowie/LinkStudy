@@ -372,6 +372,109 @@ void main() {
       expect(decoded.reminderAcknowledgements.single.isHandled, true);
     });
 
+    test('fixedBlocks round-trip with data', () {
+      final data = GeneralScheduleData(
+        activeScheduleId: 'sched1',
+        schedules: [
+          GeneralSchedule(id: 'sched1', name: 'My Schedule', events: const []),
+        ],
+        fixedBlocks: const [
+          GeneralFixedBlock(
+            label: '午饭',
+            startMinute: 12 * 60,
+            endMinute: 13 * 60,
+          ),
+          GeneralFixedBlock(
+            label: '晚饭',
+            startMinute: 18 * 60,
+            endMinute: 19 * 60,
+          ),
+        ],
+      );
+
+      final decoded = GeneralScheduleData.fromJson(data.toJson());
+
+      expect(decoded.fixedBlocks, hasLength(2));
+      expect(decoded.fixedBlocks[0].label, '午饭');
+      expect(decoded.fixedBlocks[0].startMinute, 12 * 60);
+      expect(decoded.fixedBlocks[0].endMinute, 13 * 60);
+      expect(decoded.fixedBlocks[1].label, '晚饭');
+      expect(decoded.fixedBlocks[1].startMinute, 18 * 60);
+      expect(decoded.fixedBlocks[1].endMinute, 19 * 60);
+    });
+
+    test('legacy lunch minute keys migrate to a fixed block', () {
+      final decoded = GeneralScheduleData.fromJson({
+        'schemaVersion': 3,
+        'activeScheduleId': 'sched1',
+        'schedules': [
+          {'id': 'sched1', 'name': 'My Schedule', 'events': <Object>[]},
+        ],
+        'lunchStartMinute': 12 * 60,
+        'lunchEndMinute': 13 * 60,
+      });
+
+      expect(decoded.fixedBlocks, hasLength(1));
+      expect(decoded.fixedBlocks.single.label, '午休');
+      expect(decoded.fixedBlocks.single.startMinute, 12 * 60);
+      expect(decoded.fixedBlocks.single.endMinute, 13 * 60);
+    });
+
+    test('legacy lunch hour keys migrate to a fixed block', () {
+      final decoded = GeneralScheduleData.fromJson({
+        'activeScheduleId': 'sched1',
+        'schedules': [
+          {'id': 'sched1', 'name': 'My Schedule', 'events': <Object>[]},
+        ],
+        'lunchStartHour': 11,
+        'lunchEndHour': 12,
+      });
+
+      expect(decoded.fixedBlocks, hasLength(1));
+      expect(decoded.fixedBlocks.single.label, '午休');
+      expect(decoded.fixedBlocks.single.startMinute, 11 * 60);
+      expect(decoded.fixedBlocks.single.endMinute, 12 * 60);
+    });
+
+    test('fixedBlocks normalize trims labels and clamps into day window', () {
+      final data = GeneralScheduleData(
+        activeScheduleId: 'sched1',
+        schedules: [
+          GeneralSchedule(id: 'sched1', name: 'My Schedule', events: const []),
+        ],
+        dayStartMinute: 8 * 60,
+        dayEndMinute: 22 * 60,
+        fixedBlocks: const [
+          GeneralFixedBlock(
+            label: '   ',
+            startMinute: 12 * 60,
+            endMinute: 12 * 60,
+          ),
+          GeneralFixedBlock(
+            label: ' 早饭 ',
+            startMinute: 7 * 60,
+            endMinute: 8 * 60 + 30,
+          ),
+          GeneralFixedBlock(
+            label: '晚饭',
+            startMinute: 18 * 60,
+            endMinute: 23 * 60,
+          ),
+        ],
+      );
+
+      final normalized = data.normalized();
+
+      // 空白名+无效时长被丢弃；部分在窗口外的被截进窗口。
+      expect(normalized.fixedBlocks, hasLength(2));
+      expect(normalized.fixedBlocks[0].label, '早饭');
+      expect(normalized.fixedBlocks[0].startMinute, 8 * 60);
+      expect(normalized.fixedBlocks[0].endMinute, 8 * 60 + 30);
+      expect(normalized.fixedBlocks[1].label, '晚饭');
+      expect(normalized.fixedBlocks[1].startMinute, 18 * 60);
+      expect(normalized.fixedBlocks[1].endMinute, 22 * 60);
+    });
+
     test(
       'schema version 2 data defaults to empty reminder acknowledgements',
       () {

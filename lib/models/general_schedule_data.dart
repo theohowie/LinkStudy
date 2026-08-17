@@ -133,6 +133,60 @@ String normalizeGeneralView(String? value) {
   }
 }
 
+/// 固定无法安排日程的时间段（如 12:00-13:00 午饭、13:00-14:00 午休）。
+class GeneralFixedBlock {
+  const GeneralFixedBlock({
+    required this.label,
+    required this.startMinute,
+    required this.endMinute,
+  });
+
+  final String label;
+  final int startMinute;
+  final int endMinute;
+
+  GeneralFixedBlock copyWith({
+    String? label,
+    int? startMinute,
+    int? endMinute,
+  }) {
+    return GeneralFixedBlock(
+      label: label ?? this.label,
+      startMinute: startMinute ?? this.startMinute,
+      endMinute: endMinute ?? this.endMinute,
+    );
+  }
+
+  /// 归一化：名称去空白（空则用"休息"），时间 clamp 到合法分钟范围。
+  /// 起止相同时保留原样（end <= start），由调用方判定无效并丢弃。
+  GeneralFixedBlock normalized() {
+    final start = startMinute.clamp(0, 24 * 60 - 1).toInt();
+    final end = endMinute.clamp(0, 24 * 60).toInt();
+    final trimmed = label.trim();
+    return GeneralFixedBlock(
+      label: trimmed.isEmpty ? '休息' : trimmed,
+      startMinute: start,
+      endMinute: end,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'label': label,
+    'startMinute': startMinute,
+    'endMinute': endMinute,
+  };
+
+  factory GeneralFixedBlock.fromJson(Map<String, dynamic> json) {
+    final rawLabel = json['label'];
+    final label = rawLabel is String ? rawLabel.trim() : '';
+    return GeneralFixedBlock(
+      label: label.isEmpty ? '休息' : label,
+      startMinute: (json['startMinute'] as num?)?.toInt() ?? 12 * 60,
+      endMinute: (json['endMinute'] as num?)?.toInt() ?? 13 * 60,
+    );
+  }
+}
+
 class GeneralScheduleData {
   const GeneralScheduleData({
     required this.activeScheduleId,
@@ -143,8 +197,7 @@ class GeneralScheduleData {
     this.showLunarCalendar = true,
     this.dayStartMinute = 6 * 60,
     this.dayEndMinute = 23 * 60,
-    this.lunchStartMinute = 12 * 60,
-    this.lunchEndMinute = 13 * 60,
+    this.fixedBlocks = const [],
     this.timeGridMinutes = 60,
     this.timelineUnitMinutes = 60,
     this.closeEventPopupOnOutsideTap = true,
@@ -163,8 +216,9 @@ class GeneralScheduleData {
   final bool showLunarCalendar;
   final int dayStartMinute;
   final int dayEndMinute;
-  final int lunchStartMinute;
-  final int lunchEndMinute;
+
+  /// 固定无法安排日程的时间段（午饭/午休/晚饭等），按开始时间排序。
+  final List<GeneralFixedBlock> fixedBlocks;
   final int timeGridMinutes;
 
   /// 时间线时间精度（分钟/刻度）：5-480 无级调节，默认 60（1 小时）。
@@ -212,8 +266,7 @@ class GeneralScheduleData {
     'showLunarCalendar': showLunarCalendar,
     'dayStartMinute': dayStartMinute,
     'dayEndMinute': dayEndMinute,
-    'lunchStartMinute': lunchStartMinute,
-    'lunchEndMinute': lunchEndMinute,
+    'fixedBlocks': fixedBlocks.map((b) => b.toJson()).toList(),
     'timeGridMinutes': timeGridMinutes,
     'timelineUnitMinutes': timelineUnitMinutes,
     'closeEventPopupOnOutsideTap': closeEventPopupOnOutsideTap,
@@ -284,18 +337,7 @@ class GeneralScheduleData {
         hourKey: 'dayEndHour',
         fallback: 23 * 60,
       ),
-      lunchStartMinute: _readDayBoundaryMinute(
-        json,
-        minuteKey: 'lunchStartMinute',
-        hourKey: 'lunchStartHour',
-        fallback: 12 * 60,
-      ),
-      lunchEndMinute: _readDayBoundaryMinute(
-        json,
-        minuteKey: 'lunchEndMinute',
-        hourKey: 'lunchEndHour',
-        fallback: 13 * 60,
-      ),
+      fixedBlocks: _readFixedBlocks(json),
       timeGridMinutes: _normalizeGridMinutes(
         _intValue(json['timeGridMinutes']),
       ),
@@ -340,8 +382,7 @@ class GeneralScheduleData {
     bool? showLunarCalendar,
     int? dayStartMinute,
     int? dayEndMinute,
-    int? lunchStartMinute,
-    int? lunchEndMinute,
+    List<GeneralFixedBlock>? fixedBlocks,
     int? timeGridMinutes,
     int? timelineUnitMinutes,
     bool? closeEventPopupOnOutsideTap,
@@ -362,8 +403,7 @@ class GeneralScheduleData {
       showLunarCalendar: showLunarCalendar ?? this.showLunarCalendar,
       dayStartMinute: dayStartMinute ?? this.dayStartMinute,
       dayEndMinute: dayEndMinute ?? this.dayEndMinute,
-      lunchStartMinute: lunchStartMinute ?? this.lunchStartMinute,
-      lunchEndMinute: lunchEndMinute ?? this.lunchEndMinute,
+      fixedBlocks: fixedBlocks ?? this.fixedBlocks,
       timeGridMinutes: timeGridMinutes ?? this.timeGridMinutes,
       timelineUnitMinutes: _normalizeTimelineUnitMinutes(
         timelineUnitMinutes ?? this.timelineUnitMinutes,
@@ -447,8 +487,23 @@ class GeneralScheduleData {
         : normalizedSchedules.first.id;
     final start = dayStartMinute.clamp(0, 24 * 60 - 1).toInt();
     final end = dayEndMinute.clamp(start + 1, 24 * 60).toInt();
-    final lunchStart = lunchStartMinute.clamp(start, end - 1).toInt();
-    final lunchEnd = lunchEndMinute.clamp(lunchStart + 1, end).toInt();
+    // 固定时间段：与日窗口取交集后 clamp 进窗口，去重排序。
+    final normalizedBlocks = <GeneralFixedBlock>[];
+    for (final block in fixedBlocks) {
+      final raw = block.normalized();
+      final blockStart = raw.startMinute.clamp(start, end).toInt();
+      final blockEnd = raw.endMinute.clamp(start, end).toInt();
+      if (blockEnd > blockStart) {
+        normalizedBlocks.add(
+          GeneralFixedBlock(
+            label: raw.label,
+            startMinute: blockStart,
+            endMinute: blockEnd,
+          ),
+        );
+      }
+    }
+    normalizedBlocks.sort((a, b) => a.startMinute.compareTo(b.startMinute));
     final acknowledgementsByKey = <String, GeneralReminderAcknowledgement>{};
     for (final acknowledgement in reminderAcknowledgements) {
       final normalized = acknowledgement.normalized();
@@ -474,8 +529,7 @@ class GeneralScheduleData {
       showLunarCalendar: showLunarCalendar,
       dayStartMinute: start,
       dayEndMinute: end,
-      lunchStartMinute: lunchStart,
-      lunchEndMinute: lunchEnd,
+      fixedBlocks: normalizedBlocks,
       timeGridMinutes: _normalizeGridMinutes(timeGridMinutes),
       timelineUnitMinutes: _normalizeTimelineUnitMinutes(timelineUnitMinutes),
       closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,
@@ -541,6 +595,41 @@ int _readDayBoundaryMinute(
   final hours = _intValue(json[hourKey]);
   if (hours != null) return hours * 60;
   return fallback;
+}
+
+/// 读取固定不可安排时间段：优先新字段 fixedBlocks；
+/// 兼容旧版午休开始/结束字段（迁移为一条"午休"时间段）。
+List<GeneralFixedBlock> _readFixedBlocks(Map<String, dynamic> json) {
+  final raw = json['fixedBlocks'];
+  if (raw is List) {
+    return raw
+        .map(_asStringKeyedMap)
+        .whereType<Map<String, dynamic>>()
+        .map(GeneralFixedBlock.fromJson)
+        .toList();
+  }
+  final lunchStart = _readDayBoundaryMinute(
+    json,
+    minuteKey: 'lunchStartMinute',
+    hourKey: 'lunchStartHour',
+    fallback: -1,
+  );
+  final lunchEnd = _readDayBoundaryMinute(
+    json,
+    minuteKey: 'lunchEndMinute',
+    hourKey: 'lunchEndHour',
+    fallback: -1,
+  );
+  if (lunchStart >= 0 && lunchEnd > lunchStart) {
+    return [
+      GeneralFixedBlock(
+        label: '午休',
+        startMinute: lunchStart,
+        endMinute: lunchEnd,
+      ),
+    ];
+  }
+  return const [];
 }
 
 String _normalizeUniqueId(

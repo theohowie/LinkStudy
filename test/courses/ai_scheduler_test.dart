@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:linkstudy/courses/ai_scheduler.dart';
 import 'package:linkstudy/courses/ai_skill_package.dart';
 import 'package:linkstudy/courses/link_course.dart';
+import 'package:linkstudy/models/general_models.dart';
 import 'package:linkstudy/services/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -662,12 +663,18 @@ void main() {
     });
   });
 
-  group('availabilityFromDayWindow', () {    test('正常午休拆分为两个时段', () {
+  group('availabilityFromDayWindow', () {
+    test('正常午休拆分为两个时段', () {
       final days = availabilityFromDayWindow(
         startMinute: 8 * 60,
-        lunchStartMinute: 12 * 60,
-        lunchEndMinute: 13 * 60,
         endMinute: 22 * 60,
+        blocks: const [
+          GeneralFixedBlock(
+            label: '午休',
+            startMinute: 12 * 60,
+            endMinute: 13 * 60,
+          ),
+        ],
       );
       expect(days, hasLength(7));
       final slots = days.first;
@@ -678,12 +685,17 @@ void main() {
       expect(slots[1].endMinute, 22 * 60);
     });
 
-    test('午休无效时退化为单时段', () {
+    test('无效时间段（起止相同）被忽略，退化为单时段', () {
       final days = availabilityFromDayWindow(
         startMinute: 8 * 60,
-        lunchStartMinute: 8 * 60,
-        lunchEndMinute: 8 * 60,
         endMinute: 22 * 60,
+        blocks: const [
+          GeneralFixedBlock(
+            label: '无效',
+            startMinute: 8 * 60,
+            endMinute: 8 * 60,
+          ),
+        ],
       );
       final slots = days.first;
       expect(slots, hasLength(1));
@@ -694,15 +706,70 @@ void main() {
     test('支持非整点时间', () {
       final days = availabilityFromDayWindow(
         startMinute: 8 * 60 + 30,
-        lunchStartMinute: 12 * 60 + 15,
-        lunchEndMinute: 13 * 60 + 45,
         endMinute: 22 * 60 + 10,
+        blocks: const [
+          GeneralFixedBlock(
+            label: '午休',
+            startMinute: 12 * 60 + 15,
+            endMinute: 13 * 60 + 45,
+          ),
+        ],
       );
       final slots = days.first;
       expect(slots[0].startMinute, 8 * 60 + 30);
       expect(slots[0].endMinute, 12 * 60 + 15);
       expect(slots[1].startMinute, 13 * 60 + 45);
       expect(slots[1].endMinute, 22 * 60 + 10);
+    });
+
+    test('多个固定时间段（午饭/午休/晚饭）切出多个可用时段', () {
+      final days = availabilityFromDayWindow(
+        startMinute: 8 * 60,
+        endMinute: 22 * 60,
+        blocks: const [
+          GeneralFixedBlock(
+            label: '午饭',
+            startMinute: 12 * 60,
+            endMinute: 13 * 60,
+          ),
+          GeneralFixedBlock(
+            label: '午休',
+            startMinute: 13 * 60,
+            endMinute: 14 * 60,
+          ),
+          GeneralFixedBlock(
+            label: '晚饭',
+            startMinute: 18 * 60,
+            endMinute: 19 * 60,
+          ),
+        ],
+      );
+      final slots = days.first;
+      expect(slots, hasLength(3));
+      expect(slots[0].startMinute, 8 * 60);
+      expect(slots[0].endMinute, 12 * 60);
+      expect(slots[1].startMinute, 14 * 60);
+      expect(slots[1].endMinute, 18 * 60);
+      expect(slots[2].startMinute, 19 * 60);
+      expect(slots[2].endMinute, 22 * 60);
+    });
+
+    test('时间段完全在窗口外时忽略', () {
+      final days = availabilityFromDayWindow(
+        startMinute: 8 * 60,
+        endMinute: 22 * 60,
+        blocks: const [
+          GeneralFixedBlock(
+            label: '深夜',
+            startMinute: 23 * 60,
+            endMinute: 23 * 60 + 30,
+          ),
+        ],
+      );
+      final slots = days.first;
+      expect(slots, hasLength(1));
+      expect(slots.single.startMinute, 8 * 60);
+      expect(slots.single.endMinute, 22 * 60);
     });
   });
 }

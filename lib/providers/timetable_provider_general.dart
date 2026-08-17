@@ -18,8 +18,10 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
   bool get generalShowLunarCalendar => _appData.generalMode.showLunarCalendar;
   int get generalDayStartMinute => _appData.generalMode.dayStartMinute;
   int get generalDayEndMinute => _appData.generalMode.dayEndMinute;
-  int get generalLunchStartMinute => _appData.generalMode.lunchStartMinute;
-  int get generalLunchEndMinute => _appData.generalMode.lunchEndMinute;
+
+  /// 固定无法安排日程的时间段（午饭/午休/晚饭等）。
+  List<GeneralFixedBlock> get generalFixedBlocks =>
+      _appData.generalMode.fixedBlocks;
   int get generalTimeGridMinutes => _appData.generalMode.timeGridMinutes;
   int get generalTimelineUnitMinutes =>
       _appData.generalMode.timelineUnitMinutes;
@@ -107,8 +109,7 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
     bool? showLunarCalendar,
     int? dayStartMinute,
     int? dayEndMinute,
-    int? lunchStartMinute,
-    int? lunchEndMinute,
+    List<GeneralFixedBlock>? fixedBlocks,
     int? timeGridMinutes,
     int? timelineUnitMinutes,
     bool? closeEventPopupOnOutsideTap,
@@ -121,8 +122,7 @@ mixin _TimetableProviderGeneral on _TimetableProviderBase {
         showLunarCalendar: showLunarCalendar,
         dayStartMinute: dayStartMinute,
         dayEndMinute: dayEndMinute,
-        lunchStartMinute: lunchStartMinute,
-        lunchEndMinute: lunchEndMinute,
+        fixedBlocks: fixedBlocks,
         timeGridMinutes: timeGridMinutes,
         timelineUnitMinutes: timelineUnitMinutes,
         closeEventPopupOnOutsideTap: closeEventPopupOnOutsideTap,

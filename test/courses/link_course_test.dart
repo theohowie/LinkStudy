@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linkstudy/courses/link_course.dart';
+import 'package:linkstudy/models/general_models.dart';
 
 void main() {
   setUp(() {
@@ -9,9 +10,14 @@ void main() {
 
   final availability = availabilityFromDayWindow(
     startMinute: 8 * 60,
-    lunchStartMinute: 12 * 60,
-    lunchEndMinute: 13 * 60,
     endMinute: 22 * 60,
+    blocks: const [
+      GeneralFixedBlock(
+        label: '午休',
+        startMinute: 12 * 60,
+        endMinute: 13 * 60,
+      ),
+    ],
   );
 
   group('LinkCourseStore 入池与排课', () {

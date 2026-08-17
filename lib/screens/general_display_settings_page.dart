@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../l10n/app_locale.dart' as app_locale;
 import '../l10n/app_localizations.dart';
 import '../providers/timetable_provider.dart';
-import '../utils/time_utils.dart';
 import '../widgets/sked_dropdown_menu.dart';
 import '../widgets/settings_list.dart';
 
@@ -17,6 +16,7 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Consumer<TimetableProvider>(
       builder: (context, provider, child) {
+        final theme = Theme.of(context);
         final localeCode = app_locale.normalizeLocaleCode(provider.localeCode);
         return Scaffold(
           appBar: AppBar(title: Text(l10n.generalDisplaySettings)),
@@ -100,31 +100,40 @@ class GeneralDisplaySettingsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              _TimeSettingTile(
-                icon: Icons.free_breakfast_outlined,
-                title: l10n.lunchStartHour,
-                minute: provider.generalLunchStartMinute,
-                onTap: () => _pickTime(
-                  context,
-                  provider,
-                  initialMinute: provider.generalLunchStartMinute,
-                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
-                    lunchStartMinute: minute,
+              const SizedBox(height: 8),
+              SettingsSectionHeader(title: '固定无法安排日程时间段'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(
+                  '这些时间段不会安排课程，可添加多个'
+                  '（如 12:00-13:00 午饭、13:00-14:00 午休、18:00-19:00 晚饭）',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-              _TimeSettingTile(
-                icon: Icons.free_breakfast_outlined,
-                title: l10n.lunchEndHour,
-                minute: provider.generalLunchEndMinute,
-                onTap: () => _pickTime(
-                  context,
-                  provider,
-                  initialMinute: provider.generalLunchEndMinute,
-                  onPicked: (minute) => provider.updateGeneralDisplaySettings(
-                    lunchEndMinute: minute,
+              if (provider.generalFixedBlocks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+                  child: Text(
+                    '暂无固定时间段',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                )
+              else
+                for (var i = 0; i < provider.generalFixedBlocks.length; i++)
+                  _FixedBlockTile(
+                    block: provider.generalFixedBlocks[i],
+                    onTap: () => _editFixedBlock(context, provider, i),
+                    onDelete: () => _deleteFixedBlock(context, provider, i),
+                  ),
+              SettingsListTile(
+                leading: const Icon(Icons.add_circle_outline),
+                title: '添加时间段',
+                trailing: const Icon(Icons.add),
+                onTap: () => _addFixedBlock(context, provider),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -342,4 +351,187 @@ Future<void> _pickTime(
   );
   if (picked == null) return;
   onPicked(picked.hour * 60 + picked.minute);
+}
+
+/// 固定时间段设置项：显示名称与起止时间，点击编辑，右侧删除按钮。
+class _FixedBlockTile extends StatelessWidget {
+  const _FixedBlockTile({
+    required this.block,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final GeneralFixedBlock block;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsListTile(
+      leading: const Icon(Icons.block_outlined),
+      title: block.label,
+      subtitle:
+          '${formatMinutes(block.startMinute)} - ${formatMinutes(block.endMinute)}',
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline),
+        tooltip: '删除',
+        onPressed: onDelete,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+/// 添加/编辑固定时间段弹窗：名称输入 + 开始/结束时间选择器。
+class _FixedBlockDialog extends StatefulWidget {
+  const _FixedBlockDialog({this.initial});
+
+  final GeneralFixedBlock? initial;
+
+  @override
+  State<_FixedBlockDialog> createState() => _FixedBlockDialogState();
+}
+
+class _FixedBlockDialogState extends State<_FixedBlockDialog> {
+  late final TextEditingController _labelController = TextEditingController(
+    text: widget.initial?.label ?? '',
+  );
+  late int _startMinute = widget.initial?.startMinute ?? 12 * 60;
+  late int _endMinute = widget.initial?.endMinute ?? 13 * 60;
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    super.dispose();
+  }
+
+  Future<int?> _pickDialogTime(int initialMinute) {
+    return showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: initialMinute ~/ 60,
+        minute: initialMinute % 60,
+      ),
+      helpText: '选择时间',
+      cancelText: '取消',
+      confirmText: '确定',
+    ).then((picked) => picked == null ? null : picked.hour * 60 + picked.minute);
+  }
+
+  Future<void> _pickStart() async {
+    final picked = await _pickDialogTime(_startMinute);
+    if (picked != null && mounted) {
+      setState(() => _startMinute = picked);
+    }
+  }
+
+  Future<void> _pickEnd() async {
+    final picked = await _pickDialogTime(_endMinute);
+    if (picked != null && mounted) {
+      setState(() => _endMinute = picked);
+    }
+  }
+
+  void _confirm() {
+    if (_endMinute <= _startMinute) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('结束时间必须晚于开始时间')),
+      );
+      return;
+    }
+    final label = _labelController.text.trim();
+    Navigator.of(context).pop(
+      GeneralFixedBlock(
+        label: label.isEmpty ? '休息' : label,
+        startMinute: _startMinute,
+        endMinute: _endMinute,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initial == null ? '添加时间段' : '编辑时间段'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _labelController,
+            decoration: const InputDecoration(
+              labelText: '名称（如：午饭）',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.access_time),
+            title: const Text('开始时间'),
+            trailing: Text(
+              formatMinutes(_startMinute),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onTap: _pickStart,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.access_time),
+            title: const Text('结束时间'),
+            trailing: Text(
+              formatMinutes(_endMinute),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            onTap: _pickEnd,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _confirm, child: const Text('确定')),
+      ],
+    );
+  }
+}
+
+Future<void> _addFixedBlock(
+  BuildContext context,
+  TimetableProvider provider,
+) async {
+  final block = await showDialog<GeneralFixedBlock>(
+    context: context,
+    builder: (_) => const _FixedBlockDialog(),
+  );
+  if (block == null) return;
+  await provider.updateGeneralDisplaySettings(
+    fixedBlocks: [...provider.generalFixedBlocks, block],
+  );
+}
+
+Future<void> _editFixedBlock(
+  BuildContext context,
+  TimetableProvider provider,
+  int index,
+) async {
+  final current = provider.generalFixedBlocks[index];
+  final block = await showDialog<GeneralFixedBlock>(
+    context: context,
+    builder: (_) => _FixedBlockDialog(initial: current),
+  );
+  if (block == null) return;
+  final updated = [...provider.generalFixedBlocks];
+  updated[index] = block;
+  await provider.updateGeneralDisplaySettings(fixedBlocks: updated);
+}
+
+Future<void> _deleteFixedBlock(
+  BuildContext context,
+  TimetableProvider provider,
+  int index,
+) async {
+  final updated = [...provider.generalFixedBlocks]..removeAt(index);
+  await provider.updateGeneralDisplaySettings(fixedBlocks: updated);
 }

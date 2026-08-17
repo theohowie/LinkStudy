@@ -58,8 +58,8 @@ void main() {
   testWidgets('shows default view as a setting instead of page tabs', (
     tester,
   ) async {
-    // 页面含午休设置后内容变长，放大视口确保底部项可见。
-    tester.view.physicalSize = const Size(800, 1600);
+    // 页面含固定时间段设置后内容变长，放大视口确保底部项可见。
+    tester.view.physicalSize = const Size(800, 2200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final provider = await _createProvider();
@@ -105,5 +105,48 @@ void main() {
 
     expect(menuItemRect.left, closeTo(dropdownRect.left, 1));
     expect(menuItemRect.width, greaterThanOrEqualTo(dropdownRect.width - 16));
+  });
+
+  testWidgets('固定无法安排日程时间段：添加、编辑、删除', (tester) async {
+    tester.view.physicalSize = const Size(800, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final provider = await _createProvider();
+
+    await _pumpPage(tester, provider);
+
+    // 初始为空。
+    expect(find.text('固定无法安排日程时间段'), findsOneWidget);
+    expect(find.text('暂无固定时间段'), findsOneWidget);
+
+    // 添加：默认 12:00-13:00，输入名称后确定。
+    await tester.tap(find.text('添加时间段'));
+    await tester.pumpAndSettle();
+    expect(find.text('添加时间段'), findsWidgets);
+    // 页面本身还有时间精度的数字输入框，取弹窗里最后一个 TextField。
+    await tester.enterText(find.byType(TextField).last, '午饭');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+
+    expect(provider.generalFixedBlocks, hasLength(1));
+    expect(provider.generalFixedBlocks.single.label, '午饭');
+    expect(provider.generalFixedBlocks.single.startMinute, 12 * 60);
+    expect(provider.generalFixedBlocks.single.endMinute, 13 * 60);
+    expect(find.text('午饭'), findsOneWidget);
+    expect(find.text('12:00 - 13:00'), findsOneWidget);
+
+    // 编辑：点击条目打开弹窗，取消不修改。
+    await tester.tap(find.text('午饭'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑时间段'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(provider.generalFixedBlocks, hasLength(1));
+
+    // 删除。
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.pumpAndSettle();
+    expect(provider.generalFixedBlocks, isEmpty);
+    expect(find.text('暂无固定时间段'), findsOneWidget);
   });
 }

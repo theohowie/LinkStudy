@@ -7,6 +7,7 @@ import 'package:linkstudy/courses/ai_schedule_runner.dart';
 import 'package:linkstudy/courses/ai_scheduler.dart';
 import 'package:linkstudy/courses/ai_skill_package.dart';
 import 'package:linkstudy/courses/link_course.dart';
+import 'package:linkstudy/models/general_models.dart';
 import 'package:linkstudy/services/notification_service.dart';
 import 'package:linkstudy/widgets/ai_schedule_progress_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -92,9 +93,14 @@ void main() {
 
   final availability = availabilityFromDayWindow(
     startMinute: 8 * 60,
-    lunchStartMinute: 12 * 60,
-    lunchEndMinute: 13 * 60,
     endMinute: 22 * 60,
+    blocks: const [
+      GeneralFixedBlock(
+        label: '午休',
+        startMinute: 12 * 60,
+        endMinute: 13 * 60,
+      ),
+    ],
   );
 
   Future<LinkCourse> addCourse(String id) => LinkCourseStore.instance.addCourse(
