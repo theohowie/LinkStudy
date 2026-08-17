@@ -37,8 +37,8 @@ void main() {
   group('UpdateService.checkForUpdates', () {
     setUp(() {
       PackageInfo.setMockInitialValues(
-        appName: 'Sked',
-        packageName: 'com.mashiro.sked',
+        appName: 'LinkStudy',
+        packageName: 'com.theohowie.linkstudy',
         version: '1.9.9',
         buildNumber: '1',
         buildSignature: '',
@@ -53,7 +53,7 @@ void main() {
               jsonEncode({
                 'tag_name': 'v1.10.0+2',
                 'html_url':
-                    'https://github.com/Mashiro0619/Sked/releases/tag/v1.10.0',
+                    'https://github.com/theohowie/linkstudy/releases/tag/v1.10.0',
                 'body': 'notes',
               }),
               200,
@@ -72,11 +72,11 @@ void main() {
 
     test('uses custom update feed when configured', () async {
       final service = UpdateService(
-        updateVersionUrl: 'https://updates.example.test/sked.json',
+        updateVersionUrl: 'https://updates.example.test/linkstudy.json',
         client: MockClient((request) async {
           expect(
             request.url.toString(),
-            'https://updates.example.test/sked.json',
+            'https://updates.example.test/linkstudy.json',
           );
           return http.Response(
             jsonEncode({

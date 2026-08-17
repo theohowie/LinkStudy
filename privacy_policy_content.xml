@@ -1,0 +1,237 @@
+<title>LinkStudy 隐私政策</title>
+
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p><b>当前版本：</b>2026-08-17</p>
+  <p><b>生效日期：</b>2026-08-17</p>
+  <p>LinkStudy 是基于 <a href="https://github.com/Mashiro0619/Sked">Sked</a>（AGPL-3.0）的二次开发项目，由 TheoHowie 维护（<a href="https://github.com/theohowie/linkstudy">GitHub 仓库</a>）。</p>
+</callout>
+
+<h1>一、概述</h1>
+
+<p>本隐私政策用于说明 LinkStudy 网课链接采集与课程表管理应用（以下简称「本应用」）在提供<b>网课链接悬浮采集、课程管理、AI 智能排课、课表文本/HTML 解析导入、数据导入导出、外部链接跳转</b>及相关辅助功能过程中，对信息的处理方式、处理边界、适用范围以及用户可知悉的基本规则。</p>
+
+<p>本应用为<b>本地优先</b>的软件产品，不以建立用户账号体系、持续上传用户数据或实施行为画像为基础运行模式。本政策所述的信息处理方式主要围绕本地存储、文件导入导出、悬浮窗采集、系统分享、AI 接口调用以及外部链接跳转等场景展开。</p>
+
+<h1>二、数据模式基本原则</h1>
+
+<ul>
+  <li><b>本地优先：</b>课程、链接、排课结果、设置和备份默认保存在当前设备本地，不自动上传。</li>
+  <li><b>外部访问按触发：</b>仅在你主动触发导入、导出、分享、打开外部链接、检查更新或调用 AI 功能时，才会涉及外部交互。</li>
+  <li><b>无账号与遥测：</b>默认不收集。不要求注册 LinkStudy 账号，不默认启用分析、广告、崩溃上报或云端画像。</li>
+</ul>
+
+<h1>三、适用范围</h1>
+
+<p>本隐私政策适用于 LinkStudy 应用及其直接相关的以下功能：</p>
+<ul>
+  <li>学生课表与通用日程的创建、编辑、存储与展示</li>
+  <li>悬浮窗（悬浮球 + 填写面板）网课链接采集与课程草稿保存</li>
+  <li>AI 智能排课（基于优先级、截止日期与时长的自动调度）</li>
+  <li>课表文本 / HTML 内容的 AI 解析导入</li>
+  <li>课程与日程数据的导入、导出、分享与完整备份恢复</li>
+  <li>应用内外部链接跳转与系统分享行为</li>
+</ul>
+
+<h1>四、本地存储的数据</h1>
+
+<p>本应用会将以下数据保存于你的设备本地，不会自动上传至开发者服务器：</p>
+
+<table>
+  <colgroup><col span="1" width="200"/><col span="1" width="260"/><col span="1" width="300"/></colgroup>
+  <thead>
+    <tr>
+      <th background-color="light-gray">数据类别</th>
+      <th background-color="light-gray">存储位置</th>
+      <th background-color="light-gray">说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>课程与日程数据</b></td>
+      <td>应用本地文件目录</td>
+      <td>课表结构、课程信息、通用日程事件、排课结果、节次模板、学校站点配置</td>
+    </tr>
+    <tr>
+      <td><b>应用设置项</b></td>
+      <td>SharedPreferences</td>
+      <td>主题色、语言、悬浮窗开关/样式/透明度、AI 提供商与 Base URL、模型名选择等</td>
+    </tr>
+    <tr>
+      <td><b>API 密钥</b></td>
+      <td>FlutterSecureStorage（平台安全存储）</td>
+      <td>课表解析 API Key、AI 排课 API Key，加密存储，不写入普通数据文件</td>
+    </tr>
+    <tr>
+      <td><b>AI 用量统计</b></td>
+      <td>应用本地文件目录</td>
+      <td>每次 AI 调用的 token 用量与估算费用，仅供本地查看</td>
+    </tr>
+    <tr>
+      <td><b>完整备份文件</b></td>
+      <td>用户指定的导出路径</td>
+      <td>包含课程、日程、设置等全部本地数据（<b>不含 API 密钥</b>）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>五、权限使用说明</h1>
+
+<p>根据应用功能需要，本应用可能会在相应平台申请下列权限。所有权限均为<b>功能必需</b>，不用于无关的数据收集：</p>
+
+<callout emoji="⚠️" background-color="light-yellow" border-color="yellow">
+  <p>以下为 Android 平台权限说明；其他平台（如 Web/桌面）的权限行为以对应系统规则为准。</p>
+</callout>
+
+<h2>5.1 悬浮窗权限（SYSTEM_ALERT_WINDOW）</h2>
+
+<p><b>用途：</b>用于显示悬浮球与悬浮填写面板，使你在其他应用中浏览网课时可快速采集链接并填写课程信息。</p>
+<p><b>行为边界：</b></p>
+<ul>
+  <li>默认关闭。你可在「设置 → 悬浮窗设置」中手动开启，并需跳转系统授权页授予「显示在其他应用上层」权限。</li>
+  <li>开启后，悬浮窗以前台服务（Foreground Service）形式运行，系统状态栏会显示常驻通知（属 Android 前台服务强制要求）。</li>
+  <li>悬浮窗的样式（胶囊/圆球）、透明度仅保存在本地 SharedPreferences。</li>
+  <li>当前应用的 Material 3 主题色（primary / surface 等）会同步下发给原生面板用于着色，该数据仅跨进程传递、不落地上传。</li>
+</ul>
+
+<h2>5.2 通知权限（POST_NOTIFICATIONS）</h2>
+
+<p><b>用途：</b>用于 AI 排课完成或失败时的本地提醒，以及悬浮窗前台服务的常驻通知。</p>
+<p><b>行为边界：</b></p>
+<ul>
+  <li>Android 13 及以上版本首次启动相关功能时，会弹窗请求你授权；你可随时在系统设置中撤销。</li>
+  <li>所有通知均由应用在本地触发（flutter_local_notifications），不依赖推送服务，不向你发送营销消息。</li>
+</ul>
+
+<h2>5.3 网络权限（INTERNET）</h2>
+
+<p><b>用途：</b>仅在下列<b>你主动触发</b>的场景下使用：</p>
+<ul>
+  <li>应用内点击「检查更新」→ 请求 GitHub Releases API 或你自定义的更新地址（详见下文第七节）</li>
+  <li>启动时静默请求隐私政策版本页（详见下文第九节）</li>
+  <li>你主动调用 AI 排课功能 → 请求你配置的 OpenAI 兼容接口</li>
+  <li>你主动执行课表解析导入 → 请求你配置的 OpenAI 兼容接口</li>
+  <li>你点击课表中的网课链接或外部超链接 → 由系统浏览器接管</li>
+</ul>
+
+<h2>5.4 存储访问权限（READ/WRITE_EXTERNAL_STORAGE）</h2>
+
+<p><b>用途：</b>用于你主动选择的文件导入（课表 JSON、备份 JSON、ICS 文件）与导出保存操作。仅在你通过文件选择器指定路径时访问对应文件。</p>
+
+<h1>六、悬浮窗与网课链接采集</h1>
+
+<p>当你在其他应用中复制网课链接或使用系统拖放功能时，可通过悬浮窗把链接采集进本应用。该模块的行为规则如下：</p>
+
+<ul>
+  <li><b>剪贴板读取：</b>仅发生在本应用处于前台、或你主动点击悬浮窗「粘贴」按钮并跳转前台确认时。应用<b>不会在后台监听或自动读取</b>你的剪贴板内容。</li>
+  <li><b>拖放采集：</b>拖放内容由系统拖放事件携带，仅在你主动将内容拖放到悬浮窗区域时触发。</li>
+  <li><b>课程草稿保存：</b>在悬浮填写面板中填写的 URL、标题、时长、优先级、截止日期等信息，通过 EventChannel 传递到 Flutter 侧，经解析校验后写入本地课程存储。全部过程在设备本地完成。</li>
+  <li><b>不做后台监听：</b>悬浮窗不记录你在其他应用的操作行为、不截屏、不读取其他应用界面内容。</li>
+</ul>
+
+<h1>七、AI 智能排课功能</h1>
+
+<p>本应用提供基于大语言模型的 AI 自动排课功能。该功能需你<b>主动配置并触发</b>：</p>
+
+<h2>7.1 配置项与存储</h2>
+
+<ul>
+  <li><b>提供商：</b>内置 DeepSeek、OpenAI 两个预设，也支持自定义 Base URL（任意 OpenAI 兼容接口）。</li>
+  <li><b>Base URL：</b>例如 https://api.deepseek.com/v1 或你自建的 http(s) 端点，保存在 SharedPreferences。</li>
+  <li><b>API 密钥：</b>通过 FlutterSecureStorage 加密保存在平台安全存储区，<b>不写入</b>普通 JSON 数据文件，也<b>不包含</b>在完整应用备份中。</li>
+  <li><b>模型名称：</b>可手动填写，也可点击「获取模型列表」从你配置的接口拉取。</li>
+</ul>
+
+<h2>7.2 网络请求行为</h2>
+
+<p>你主动执行 AI 排课或「测试连接」「获取模型列表」时，应用会向你配置的接口发起以下请求：</p>
+
+<ul>
+  <li><b>获取模型列表：</b>GET <code>{Base URL}/models</code>，携带 Bearer Token。</li>
+  <li><b>测试连接 / 排课请求：</b>POST <code>{Base URL}/chat/completions</code>，携带 Bearer Token、课程列表、排课约束、提示词、当前应用语言。</li>
+</ul>
+
+<p>请求失败或超时不会阻塞应用主流程。排课结果在本地解析后写入课程存储，同时发送一条本地通知提醒你完成或失败。本地会记录每次调用的 token 用量与估算费用，仅供你在设置页查看。</p>
+
+<callout emoji="❓" background-color="light-yellow" border-color="yellow">
+  <p><b>请你自行确认：</b>所配置接口的隐私政策、配额限制、日志保留规则与合规要求。若你使用 <code>http://</code> 明文 Base URL，请仅在可信设备、可信网络和可信接口服务中使用——内容与 API 密钥可能不受传输层加密保护。</p>
+</callout>
+
+<h1>八、课表解析导入功能</h1>
+
+<p>本应用支持通过自定义 AI 接口解析学校网页、文本或 HTML 源码中的课表内容。行为规则如下：</p>
+
+<ul>
+  <li><b>触发条件：</b>仅在你主动进入导入流程、粘贴文本/HTML、或在应用内 WebView 中打开学校站点并点击「解析页面」时执行。</li>
+  <li><b>接口配置：</b>与 AI 排课共享同一套 OpenAI 兼容接口参数（Base URL / API 密钥 / 模型名 / 自定义提示词），API 密钥同样经 FlutterSecureStorage 加密保存。</li>
+  <li><b>发送内容：</b>你主动提交的普通课表文本、页面文本或 HTML 内容，以及可选的页面标题、页面 URL、当前应用语言和解析提示词。</li>
+  <li><b>导入预览：</b>解析结果会在本地展示供你预览，你可选择节次时间集并决定导入为新课表或替换当前课表——未确认前不会写入正式课表存储。</li>
+</ul>
+
+<h1>九、更新检查与隐私政策版本检测</h1>
+
+<h2>9.1 应用更新检查</h2>
+
+<p>当你主动点击「检查更新」时，应用会按以下顺序查询最新版本：</p>
+<ol>
+  <li>若你在高级设置中配置了自定义更新地址（仅 https），则优先请求该地址的 JSON。</li>
+  <li>否则默认请求 <a href="https://api.github.com/repos/theohowie/linkstudy/releases/latest">GitHub Releases API</a> 获取最新 tag_name、发布说明与页面链接。</li>
+</ol>
+<p>该请求仅携带应用 Accept 头，<b>不携带</b>你的课程数据或个人标识信息。你可随时跳转 GitHub Releases 页面查看详情并决定是否下载。</p>
+
+<h2>9.2 隐私政策版本检测</h2>
+
+<p>应用启动时会静默请求 <a href="https://sked.mashiro.tech/privacy.html">https://sked.mashiro.tech/privacy.html</a>，仅读取页面 <code>&lt;meta name="privacy-policy-version"&gt;</code> 标签的日期值以检测是否有新版本。该请求<b>不携带</b>你的课程数据或个人标识信息。若检测到版本更新，会在下次启动时提示你重新确认隐私政策。</p>
+
+<h1>十、导入导出与备份</h1>
+
+<p>当且仅当你主动选择以下操作时，应用才会访问本地文件或读写粘贴文本：</p>
+<ul>
+  <li>导入课程 JSON 文件、通用日程 ICS 文件、粘贴 JSON 文本；</li>
+  <li>导出课程 JSON、通用日程 JSON / ICS、分享课表文件；</li>
+  <li>执行完整应用备份导出 / 恢复。</li>
+</ul>
+
+<p><b>重要：</b>完整应用备份会导出课程、日程、应用设置等本地数据，但<b>故意不包含</b>课表解析 API 密钥与 AI 排课 API 密钥。恢复完整应用备份会<b>替换</b>当前应用数据，应用会在恢复前要求你确认。单纯的导入导出行为不会将你的文件内容自动发送至外部服务。</p>
+
+<h1>十一、分享与打开外部链接</h1>
+
+<ul>
+  <li><b>分享：</b>当你主动使用分享功能时，应用会将你明确选定的导出文件交由系统分享面板或你选择的目标应用处理（通过 share_plus 与系统 FileProvider 授权）。该操作属于你主动发起的设备级分享行为，应用无法控制第三方应用在接收文件后的处理方式。</li>
+  <li><b>打开网课链接 / 外部链接：</b>当你点击课程中的网课链接、GitHub 仓库链接、DeepSeek / OpenAI API Key 管理页链接或其他外部链接时，应用会调用系统浏览器或其他外部应用完成访问请求（通过 url_launcher）。此类访问行为一旦离开本应用控制范围，相关数据处理即受对应第三方网站、平台或应用自身的规则和政策约束。请你在访问外部链接前自行审阅第三方平台的相关政策。</li>
+</ul>
+
+<h1>十二、默认不收集的内容</h1>
+
+<p>在默认状态下：</p>
+<ul>
+  <li>本应用<b>不要求</b>你注册 LinkStudy 账号；</li>
+  <li>本应用<b>不默认启用</b>分析统计、个性化广告、广告标识符跟踪、云端画像或云端自动备份；</li>
+  <li>本应用<b>不包含</b>崩溃报告、错误日志自动上报或使用情况遥测功能；</li>
+  <li>本应用<b>不在后台</b>监听剪贴板、定位、麦克风或摄像头。</li>
+</ul>
+
+<h1>十三、用户注意事项</h1>
+
+<ul>
+  <li>你应确保采集、导入、导出、分享或处理的内容系你有权处理的信息；</li>
+  <li>你应妥善保管导出的文件与 API 密钥，避免在不受信任的环境中传播；</li>
+  <li>如你通过外部网站、浏览器或第三方应用完成后续操作，应自行承担对第三方规则进行审查与选择的责任；</li>
+  <li>本应用提供的是网课链接采集与课程表管理工具，不对第三方平台（AI 接口、学校站点、视频平台、GitHub 等）的稳定性、持续可用性、内容准确性或数据处理方式作出额外保证。</li>
+</ul>
+
+<h1>十四、政策更新</h1>
+
+<p>本隐私政策可能随功能演进进行调整。重大变更会在应用内隐私政策确认环节或本页面显著位置提示，当前版本号见页面顶部。你继续使用本应用即视为认可更新后的政策。</p>
+
+<h1>十五、联系方式</h1>
+
+<p>如对本隐私政策有任何疑问或建议，可通过以下方式联系我们：</p>
+<ul>
+  <li>GitHub 仓库提交 Issue：<a href="https://github.com/theohowie/linkstudy">https://github.com/theohowie/linkstudy</a></li>
+</ul>
+
+<hr/>
+
+<callout emoji="📝" background-color="light-gray">
+  <p>本文档基于 LinkStudy 实际代码实现撰写，覆盖以下核心模块：悬浮窗采集（OverlayService/OverlayClient）、AI 排课（AiScheduler）、课表解析导入（AiScheduleSettings + SecretStore）、更新检查（UpdateService）、通知（NotificationService）、导入导出（ImportExportService）、加密存储（FlutterSecureSecretStore）。</p>
+</callout>

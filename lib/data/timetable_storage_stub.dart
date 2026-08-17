@@ -7,12 +7,25 @@ TimetableStorage createTimetableStorage() => _BrowserTimetableStorage();
 
 /// Web 没有稳定的本地文件路径，就退回浏览器存储，但数据格式还是保持同一份 JSON。
 class _BrowserTimetableStorage implements TimetableStorage {
-  static const _storageKey = 'Sked_app_data';
+  static const _storageKey = 'linkstudy_app_data';
+  static const _legacyStorageKey = 'Sked_app_data';
 
   @override
   Future<StorageLoadResult> load() async {
     final preferences = await SharedPreferences.getInstance();
-    final content = preferences.getString(_storageKey);
+    var content = preferences.getString(_storageKey);
+    // 回退迁移：如果新 key 为空，尝试从旧的 Sked_app_data 读，读得到就迁移过去。
+    if (content == null || content.trim().isEmpty) {
+      final legacy = preferences.getString(_legacyStorageKey);
+      if (legacy != null && legacy.trim().isNotEmpty) {
+        content = legacy;
+        try {
+          await preferences.setString(_storageKey, legacy);
+        } catch (_) {
+          // 迁移写入失败不影响本次读取，下次启动还会重试。
+        }
+      }
+    }
     if (content == null || content.trim().isEmpty) {
       return const StorageLoadResult.empty();
     }
@@ -37,5 +50,6 @@ class _BrowserTimetableStorage implements TimetableStorage {
   }
 
   @override
-  Future<String?> filePath() async => 'browser://local-storage/Sked_app_data';
+  Future<String?> filePath() async =>
+      'browser://local-storage/linkstudy_app_data';
 }

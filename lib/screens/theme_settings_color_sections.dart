@@ -1,4 +1,3 @@
-import '../models/general_models.dart';
 part of 'theme_settings_page.dart';
 
 class _ColorfulThemeSection extends StatelessWidget {

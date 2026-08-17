@@ -10,20 +10,27 @@ TimetableStorage createTimetableStorage() => IoTimetableStorage();
 
 /// IO 平台继续落真实文件，用户自己备份或者排查数据时都更直观。
 ///
-/// 写入策略（原子写 + 旋转 .bak）：
-/// 1. 先把新内容写到 `Sked_data.json.tmp` 并 flush。
-/// 2. 如果 `Sked_data.json` 存在，先把它重命名为 `Sked_data.json.bak`
-///    （已有的 .bak 会被覆盖，只保留最近一份）。
-/// 3. 把 `.tmp` 重命名为 `Sked_data.json`。
+/// 文件名迁移（Sked → LinkStudy）：
+/// 1. 新数据使用 `linkstudy_data.json`（以及同名 .bak/.tmp）。
+/// 2. 若新文件为空，自动回退读取旧文件 `Sked_data.json` 并迁移到新文件，
+///    旧文件保留不删，作为极端情况下的人工恢复兜底。
 ///
-/// 加载策略：先尝试主文件；解析失败或主文件缺失则尝试 `.bak`；都失败则上报
+/// 写入策略（原子写 + 旋转 .bak）：
+/// 1. 先把新内容写到 `linkstudy_data.json.tmp` 并 flush。
+/// 2. 如果 `linkstudy_data.json` 存在，先把它重命名为 `linkstudy_data.json.bak`
+///    （已有的 .bak 会被覆盖，只保留最近一份）。
+/// 3. 把 `.tmp` 重命名为 `linkstudy_data.json`。
+///
+/// 加载策略：先尝试主文件；解析失败或主文件缺失则尝试 `.bak`；再缺失
+/// 则回退读取旧文件名 `Sked_data.json` 做迁移。都失败则上报
 /// [RecoveryStatus.failedBackupRestore]。
 class IoTimetableStorage implements TimetableStorage {
   IoTimetableStorage({Future<Directory> Function()? directoryProvider})
     : _directoryProvider =
           directoryProvider ?? getApplicationDocumentsDirectory;
 
-  static const _fileName = 'Sked_data.json';
+  static const _fileName = 'linkstudy_data.json';
+  static const _legacyFileName = 'Sked_data.json';
   static const _backupSuffix = '.bak';
   static const _tempSuffix = '.tmp';
 
@@ -62,6 +69,15 @@ class IoTimetableStorage implements TimetableStorage {
     final backupAttempt = await _tryDecode(backup);
     if (mainAttempt.outcome == _Outcome.missing &&
         backupAttempt.outcome == _Outcome.missing) {
+      // 回退迁移：尝试读取旧的 Sked_data.json（含 .bak），如果有数据就
+      // 迁移到新文件名，用户升级后首次启动不会丢数据。
+      final migrated = await _tryMigrateFromLegacyIfNeeded();
+      if (migrated != null) {
+        return StorageLoadResult(
+          data: migrated.data,
+          recoveryStatus: migrated.recoveryStatus,
+        );
+      }
       return const StorageLoadResult.empty();
     }
 
@@ -162,6 +178,40 @@ class IoTimetableStorage implements TimetableStorage {
       await main.delete();
     }
     await tmp.rename(main.path);
+  }
+
+  /// 旧用户升级（Sked → LinkStudy）时，把旧的 `Sked_data.json` 迁移到
+  /// 新文件名，旧文件保留不删，作为极端情况下的人工恢复兜底。
+  Future<StorageLoadResult?> _tryMigrateFromLegacyIfNeeded() async {
+    final directory = await _directoryProvider();
+    final legacyMain =
+        File(path.join(directory.path, _legacyFileName));
+    final legacyBackup =
+        File('${legacyMain.path}$_backupSuffix');
+
+    final legacyMainAttempt = await _tryDecode(legacyMain);
+    AppData? migratedData;
+    RecoveryStatus status;
+    if (legacyMainAttempt.outcome == _Outcome.success) {
+      migratedData = legacyMainAttempt.data;
+      status = RecoveryStatus.restoredFromBackup;
+    } else {
+      final legacyBackupAttempt = await _tryDecode(legacyBackup);
+      if (legacyBackupAttempt.outcome == _Outcome.success) {
+        migratedData = legacyBackupAttempt.data;
+        status = RecoveryStatus.restoredFromBackup;
+      } else {
+        return null;
+      }
+    }
+
+    // 把迁移后的数据再用新文件名保存一遍，下次启动直接走新路径。
+    try {
+      await save(migratedData!);
+    } catch (_) {
+      // 保存失败不影响这一次能读到数据，只是下次仍会走迁移流程。
+    }
+    return StorageLoadResult(data: migratedData, recoveryStatus: status);
   }
 
   Future<_DecodeAttempt> _tryDecode(File file) async {

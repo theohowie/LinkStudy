@@ -489,10 +489,3 @@ class _UserPromptBubble extends StatelessWidget {
     );
   }
 }
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    return it.moveNext() ? it.current : null;
-  }
-}

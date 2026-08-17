@@ -2,7 +2,7 @@ name: linkstudy
 description: "A local-first timetable and schedule management app."
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ^3.11.5
@@ -46,7 +46,6 @@ flutter:
 
   assets:
     - assets/default_period_times.json
-    - assets/school_sites.json
     - assets/icons/
     - assets/schemes/
     - assets/prompts/

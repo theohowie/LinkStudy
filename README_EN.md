@@ -18,10 +18,6 @@ English
 </div>
 
 <p align="center">
-  <a href="https://play.google.com/store/apps/details?id=com.mashiro.sked">
-    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="100">
-  </a>
-  <br>
   <a href="https://github.com/theohowie/linkstudy/releases">
     <img src="https://img.shields.io/badge/Get%20it%20on-GitHub%20Releases-blue?style=for-the-badge&logo=github" alt="Get it on GitHub Releases" height="28">
   </a>
@@ -59,7 +55,7 @@ Sked stores student timetables, general schedules, app settings, period-time set
 
 The app reads files, writes files, invokes system sharing, opens external links, checks updates, fetches model lists, imports school webpages, or parses timetable text / HTML content only when you explicitly start the corresponding action.
 
-A privacy policy consent screen is shown on first launch. The full policy is available at [https://sked.mashiro.tech/privacy.html](https://sked.mashiro.tech/privacy.html).
+A privacy policy consent screen is shown on first launch. The full policy (effective 2026-08-17) is available at [https://ucnfzm25sk6q.feishu.cn/docx/H4dxd3ZlIorg1Rx2egicAxopnWe](https://ucnfzm25sk6q.feishu.cn/docx/H4dxd3ZlIorg1Rx2egicAxopnWe).
 
 ## Custom Parser Endpoint
 

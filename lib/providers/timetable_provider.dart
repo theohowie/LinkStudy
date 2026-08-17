@@ -3,7 +3,6 @@ import '../models/app_data.dart';
 import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 
 import '../data/app_repository.dart';
 import '../data/timetable_storage.dart';

@@ -161,14 +161,6 @@ void _validateStorageMapField(Map<String, dynamic> json, String key) {
   }
 }
 
-void _validateStorageObjectListField(
-  Map<String, dynamic> json,
-  String key, {
-  required String errorMessage,
-}) {
-  _storageObjectListField(json, key, errorMessage: errorMessage);
-}
-
 List<Map<String, dynamic>> _storageObjectListField(
   Map<String, dynamic> json,
   String key, {

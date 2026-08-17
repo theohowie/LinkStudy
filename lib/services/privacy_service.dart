@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -8,17 +10,29 @@ class PrivacyService {
 
   final http.Client? _client;
 
+  /// 生效日期：2026-08-17。当你在 GitHub 仓库根目录更新 privacy_version.json
+  /// 的 version 字段为更新日期时，应用会在下次启动检测到并提示用户重新确认。
+  static const _privacyVersionJsonUrl =
+      'https://raw.githubusercontent.com/TheoHowie/linkstudy/main/privacy_version.json';
+
   Future<String?> fetchCurrentPrivacyPolicyVersion() async {
     try {
       final client = _client ?? http.Client();
       final ownsClient = _client == null;
       try {
-        final uri = Uri.parse('https://sked.mashiro.tech/privacy.html');
+        final uri = Uri.parse(_privacyVersionJsonUrl);
         final response = await client
             .get(uri)
             .timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) return null;
-        return extractPrivacyPolicyVersion(response.body);
+        try {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final rawVersion = json['version']?.toString();
+          final normalized = _normalizePrivacyPolicyVersion(rawVersion);
+          return normalized;
+        } catch (_) {
+          return null;
+        }
       } finally {
         if (ownsClient) client.close();
       }

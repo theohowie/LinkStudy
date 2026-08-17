@@ -1,77 +1,77 @@
 import '../l10n/app_locale.dart';
-import '../l10n/app_strings.dart';
+import '../l10n/app_localizations.dart';
 
-AppStrings _stringsForLocale(String localeCode) {
-  return AppStrings.forLocaleCode(localeCode);
+AppLocalizations _l10nForLocale(String localeCode) {
+  return lookupAppLocalizations(appLocaleFromCode(localeCode));
 }
 
 String defaultPeriodTimeSetName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).defaultPeriodTimeSetName;
+  return _l10nForLocale(localeCode).defaultPeriodTimeSetName;
 }
 
 String periodTimeSetFallbackName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).periodTimeSetFallbackName;
+  return _l10nForLocale(localeCode).periodTimeSetFallbackName;
 }
 
 String untitledTimetableName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).untitledTimetableName;
+  return _l10nForLocale(localeCode).untitledTimetableName;
 }
 
 String newTimetableName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).newTimetableName;
+  return _l10nForLocale(localeCode).newTimetableName;
 }
 
 String newPeriodTimeSetName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).newPeriodTimeSetName;
+  return _l10nForLocale(localeCode).newPeriodTimeSetName;
 }
 
 String emptyTimetableName({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).emptyTimetableName;
+  return _l10nForLocale(localeCode).emptyTimetableName;
 }
 
 String importedPeriodTimeSetName(
   String timetableName, {
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).importedPeriodTimeSetName(timetableName);
+  return _l10nForLocale(localeCode).importedPeriodTimeSetName(timetableName);
 }
 
 String importFileTypeMismatchMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).importFileTypeMismatchMessage;
+  return _l10nForLocale(localeCode).importFileTypeMismatchMessage;
 }
 
 String importFileVersionUnsupportedMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).importFileVersionUnsupportedMessage;
+  return _l10nForLocale(localeCode).importFileVersionUnsupportedMessage;
 }
 
 String noPeriodTimesInImportMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noPeriodTimesInImportMessage;
+  return _l10nForLocale(localeCode).noPeriodTimesInImportMessage;
 }
 
 String noPeriodTimeAvailableMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noPeriodTimeAvailableMessage;
+  return _l10nForLocale(localeCode).noPeriodTimeAvailable;
 }
 
 String noImportableTimetablesMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noImportableTimetablesMessage;
+  return _l10nForLocale(localeCode).noImportableTimetables;
 }
 
 String selectAtLeastOneTimetableMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).selectAtLeastOneTimetableMessage;
+  return _l10nForLocale(localeCode).selectAtLeastOneTimetableMessage;
 }
 
 String noExportableTimetableMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noExportableTimetableMessage;
+  return _l10nForLocale(localeCode).noExportableTimetableMessage;
 }
 
 String replaceActiveRequiresSingleTimetableMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(
+  return _l10nForLocale(
     localeCode,
   ).replaceActiveRequiresSingleTimetableMessage;
 }
@@ -79,34 +79,34 @@ String replaceActiveRequiresSingleTimetableMessage({
 String noActiveTimetableToReplaceMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).noActiveTimetableToReplaceMessage;
+  return _l10nForLocale(localeCode).noActiveTimetableToReplaceMessage;
 }
 
 String periodTimeSetInUseMessage(
   int count, {
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).periodTimeSetInUseMessage(count);
+  return _l10nForLocale(localeCode).periodTimeSetInUseMessage(count);
 }
 
 String selectAtLeastOneScheduleMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).selectAtLeastOneScheduleMessage;
+  return _l10nForLocale(localeCode).selectAtLeastOneScheduleMessage;
 }
 
 String noExportableScheduleMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noExportableScheduleMessage;
+  return _l10nForLocale(localeCode).noExportableScheduleMessage;
 }
 
 String noSchedulesInImportMessage({String localeCode = defaultLocaleCode}) {
-  return _stringsForLocale(localeCode).noSchedulesInImportMessage;
+  return _l10nForLocale(localeCode).noSchedulesInImportMessage;
 }
 
 String replaceActiveRequiresSingleScheduleMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(
+  return _l10nForLocale(
     localeCode,
   ).replaceActiveRequiresSingleScheduleMessage;
 }
@@ -114,5 +114,5 @@ String replaceActiveRequiresSingleScheduleMessage({
 String noActiveScheduleToReplaceMessage({
   String localeCode = defaultLocaleCode,
 }) {
-  return _stringsForLocale(localeCode).noActiveScheduleToReplaceMessage;
+  return _l10nForLocale(localeCode).noActiveScheduleToReplaceMessage;
 }

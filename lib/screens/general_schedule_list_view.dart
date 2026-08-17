@@ -1,4 +1,3 @@
-import '../models/general_models.dart';
 part of 'general_schedule_home_screen.dart';
 
 class _ListCalendarView extends StatelessWidget {

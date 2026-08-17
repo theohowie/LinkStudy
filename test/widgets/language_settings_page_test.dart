@@ -7,7 +7,6 @@ import 'package:linkstudy/data/timetable_storage.dart';
 import 'package:linkstudy/l10n/app_locale.dart';
 import 'package:linkstudy/l10n/app_localizations.dart';
 import 'package:linkstudy/models/app_data.dart';
-import 'package:linkstudy/models/general_models.dart';
 import 'package:linkstudy/providers/timetable_provider.dart';
 import 'package:linkstudy/screens/language_settings_page.dart';
 

@@ -102,8 +102,8 @@ Future<void> _pumpGeneralScheduleHomeScreen(
   ThemeData? theme,
 }) async {
   PackageInfo.setMockInitialValues(
-    appName: 'Sked',
-    packageName: 'com.example.sked',
+    appName: 'LinkStudy',
+    packageName: 'com.theohowie.linkstudy',
     version: '1.0.0',
     buildNumber: '1',
     buildSignature: '',

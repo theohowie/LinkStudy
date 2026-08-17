@@ -67,8 +67,8 @@ class _TimelinePrecisionSheetState extends State<_TimelinePrecisionSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final label = switch (_value) {
-      <= 60 => '${_value} 分钟/格（放大）',
-      < 480 => '${_value} 分钟/格（≈${(_value / 60).toStringAsFixed(1)} 小时）',
+      <= 60 => '$_value 分钟/格（放大）',
+      < 480 => '$_value 分钟/格（≈${(_value / 60).toStringAsFixed(1)} 小时）',
       _ => '8 小时/格（缩小到最大）',
     };
     return SafeArea(

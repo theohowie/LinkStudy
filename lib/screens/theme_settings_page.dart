@@ -38,33 +38,6 @@ String _formatColorHex(int colorValue) {
   return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
 }
 
-int _effectiveUiColorValue(
-  BuildContext context,
-  TimetableProvider provider,
-  String key,
-) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return switch (key) {
-    colorfulUiPrimaryKey =>
-      provider.colorfulUiColorValues[key] ?? colorScheme.primary.toARGB32(),
-    colorfulUiSecondaryKey =>
-      provider.colorfulUiColorValues[key] ?? colorScheme.secondary.toARGB32(),
-    colorfulUiTertiaryKey =>
-      provider.colorfulUiColorValues[key] ?? colorScheme.tertiary.toARGB32(),
-    _ => provider.colorfulUiColorValues[key] ?? colorScheme.primary.toARGB32(),
-  };
-}
-
-String _uiColorLabel(BuildContext context, String key) {
-  final l10n = AppLocalizations.of(context);
-  return switch (key) {
-    colorfulUiPrimaryKey => l10n.themeColorPrimary,
-    colorfulUiSecondaryKey => l10n.themeColorSecondary,
-    colorfulUiTertiaryKey => l10n.themeColorTertiary,
-    _ => key,
-  };
-}
-
 int _effectiveGeneralMonthTextColorValue(
   BuildContext context,
   TimetableProvider provider,
@@ -701,78 +674,6 @@ class _PreviewBanner extends StatelessWidget {
           preview,
         ],
       ),
-    );
-  }
-}
-
-class _SummaryValueRow extends StatelessWidget {
-  const _SummaryValueRow({required this.label, required this.value});
-
-  final String label;
-  final Widget value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: DefaultTextStyle.merge(
-              textAlign: TextAlign.end,
-              child: value,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorValueRow extends StatelessWidget {
-  const _ColorValueRow({
-    required this.title,
-    required this.colorValue,
-    required this.preview,
-  });
-
-  final String title;
-  final int colorValue;
-  final Widget preview;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(title, style: textTheme.titleSmall)),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: Wrap(
-              alignment: WrapAlignment.end,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                preview,
-                Text(
-                  _formatColorHex(colorValue),
-                  textAlign: TextAlign.end,
-                  style: textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

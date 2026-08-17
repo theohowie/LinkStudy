@@ -671,7 +671,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _openPrivacyPolicyPage() async {
     await _guardFlow(_SettingsFlow.privacyPolicy, () async {
-      final uri = Uri.parse('https://sked.mashiro.tech/privacy.html');
+      final uri = Uri.parse(
+        'https://ucnfzm25sk6q.feishu.cn/docx/H4dxd3ZlIorg1Rx2egicAxopnWe',
+      );
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     });
   }
@@ -702,7 +704,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return '$versionLabel · ${l10n.newVersionAvailable}';
   }
 
-  String _backupFileName() => 'Sked_backup.json';
+  String _backupFileName() => 'linkstudy_backup.json';
 
   Future<void> _loadCurrentVersion() async {
     final info = await PackageInfo.fromPlatform();

@@ -728,7 +728,6 @@ class _GeneralScheduleHomeScreenState extends State<GeneralScheduleHomeScreen> {
     try {
       final runner = AiScheduleRunner.instance;
       if (runner.isRunning || runner.hasUnviewedResult) {
-        final task = runner.task;
         await showAppModalSheet<void>(
           context: context,
           maxWidth: appSheetWidthMedium,

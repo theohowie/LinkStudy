@@ -14,7 +14,7 @@ void main() {
   late IoTimetableStorage storage;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('sked_storage_test_');
+    tempDir = await Directory.systemTemp.createTemp('linkstudy_storage_test_');
     storage = IoTimetableStorage(directoryProvider: () async => tempDir);
   });
 
@@ -25,7 +25,6 @@ void main() {
   });
 
   AppData buildGeneralData(String title) {
-    final empty = AppData.fromJson(const {});
     const scheduleId = 'cal';
     return AppData(
       generalMode: GeneralScheduleData(
@@ -50,11 +49,11 @@ void main() {
   }
 
   File mainFile() =>
-      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json');
+      File('${tempDir.path}${Platform.pathSeparator}linkstudy_data.json');
   File backupFile() =>
-      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json.bak');
+      File('${tempDir.path}${Platform.pathSeparator}linkstudy_data.json.bak');
   File tempFile() =>
-      File('${tempDir.path}${Platform.pathSeparator}Sked_data.json.tmp');
+      File('${tempDir.path}${Platform.pathSeparator}linkstudy_data.json.tmp');
 
   group('IoTimetableStorage atomic write & recovery', () {
     test('first load returns null with status none', () async {

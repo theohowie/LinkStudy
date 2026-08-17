@@ -226,7 +226,9 @@ class _AppHomeScreenState extends State<AppHomeScreen> {
   }
 
   Future<void> _openPrivacyPolicyPage() async {
-    final uri = Uri.parse('https://sked.mashiro.tech/privacy.html');
+    final uri = Uri.parse(
+      'https://ucnfzm25sk6q.feishu.cn/docx/H4dxd3ZlIorg1Rx2egicAxopnWe',
+    );
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
