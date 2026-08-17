@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/general_models.dart';
 import '../providers/timetable_provider.dart';
+import '../utils/general_schedule_colors.dart';
 import 'app_modal_sheet.dart';
 
 /// 分享日程弹窗：选择范围（当天 / 未来 7 天）与格式（图片 / Markdown / JSON / 纯文字）。
@@ -145,14 +147,44 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
       _toast('$_rangeLabel为空，没有可分享的内容');
       return;
     }
-    // 渲染精美课程表海报 → 截图 → 存临时文件 → 分享图片。
+    // 确定要展示的每一天：当天 1 天 / 7 天范围全部 7 天（无课程的日期也展示）。
+    final start = normalizeDateOnly(
+      _range == _ShareRange.today
+          ? widget.provider.selectedGeneralDate
+          : _startDate,
+    );
+    final dayCount = _range == _ShareRange.today ? 1 : 7;
+    final days = [
+      for (var i = 0; i < dayCount; i++) start.add(Duration(days: i)),
+    ];
+    // 渲染海报 → 截图 → 存临时文件 → 分享图片。
+    // 海报是固定设计稿：不受系统字体缩放影响，避免小格子文字溢出。
     final boundaryKey = GlobalKey();
     final poster = RepaintBoundary(
       key: boundaryKey,
-      child: _SchedulePoster(rangeLabel: _rangeLabel, occurrences: list),
+      child: MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.noScaling),
+        child: SchedulePoster(days: days, occurrences: list),
+      ),
     );
     final overlay = Overlay.of(context);
-    final entry = OverlayEntry(builder: (_) => poster);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: -20000,
+        top: -20000,
+        width: 50000,
+        height: 50000,
+        child: IgnorePointer(
+          // 海报在超大离屏区域内按自然尺寸布局（可宽于屏幕），
+          // 截图完整捕获整张海报，且不会触发溢出异常。
+          child: UnconstrainedBox(
+            alignment: Alignment.topLeft,
+            child: poster,
+          ),
+        ),
+      ),
+    );
     overlay.insert(entry);
     try {
       await WidgetsBinding.instance.endOfFrame;
@@ -160,7 +192,7 @@ class _ShareScheduleSheetState extends State<_ShareScheduleSheet> {
       final boundary =
           boundaryKey.currentContext!.findRenderObject()!
               as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 2.5);
+      final image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
         _toast('图片生成失败');
@@ -346,254 +378,141 @@ class _FormatChip extends StatelessWidget {
   }
 }
 
-/// 课程表格式日程海报（图片分享渲染用）：左侧时间刻度 × 顶部星期/日期，
-/// 课程块按时间绝对定位在网格内，形如纸质课程表。
-class _SchedulePoster extends StatelessWidget {
-  const _SchedulePoster({required this.rangeLabel, required this.occurrences});
+/// 学习课表分享海报：柔和蓝白渐变底 + 居中半透明白色圆角大卡片，
+/// 卡片内是真正的课程表：左侧时间刻度 × 顶部星期/日期，课程按时间
+/// 放进格子，7 天横向并排（无课程的日期也展示），右下角水印。
+/// 画布宽度按天数横向撑开、高度按时间跨度自适应，与屏幕尺寸无关。
+class SchedulePoster extends StatelessWidget {
+  const SchedulePoster({super.key, required this.days, required this.occurrences});
 
-  final String rangeLabel;
+  /// 要展示的每一天（含无课程的日子）。
+  final List<DateTime> days;
   final List<GeneralEventOccurrence> occurrences;
 
-  static const _colors = [
-    Color(0xFF4D6BFE),
-    Color(0xFF22A06B),
-    Color(0xFFE8590C),
-    Color(0xFF9C36B5),
-    Color(0xFF0CA678),
-    Color(0xFFE64980),
-  ];
+  // 画布尺寸（逻辑像素）。
+  static const _edgeMargin = 80.0;
+  static const _topBottomMargin = 120.0;
+  static const _cardRadius = 28.0;
+  static const _cardPadding = 48.0;
 
-  // 课程表时间范围：6:00 - 23:00。
-  static const _minMinute = 6 * 60;
-  static const _maxMinute = 23 * 60;
+  // 配色。
+  static const _ink = Color(0xFF222222);
+  static const _subtitleColor = Color(0xFF707070);
+  static const _watermarkColor = Color(0xFF909090);
+
+  static const _weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
   @override
   Widget build(BuildContext context) {
-    // 按日期分组。
+    // 按日期分组并按开始时间排序。
     final byDay = <String, List<GeneralEventOccurrence>>{};
     for (final o in occurrences) {
-      final key = o.start.toIso8601String().split('T').first;
-      byDay.putIfAbsent(key, () => []).add(o);
+      byDay.putIfAbsent(_dateKey(o.start), () => []).add(o);
     }
-    final days = byDay.keys.toList()..sort();
-    final total = occurrences.length;
-    // 网格参数：时间刻度高 46px/小时，列宽 150px。
-    const hourHeight = 46.0;
-    const timeColWidth = 56.0;
-    const dayColWidth = 150.0;
-    final gridHeight = (_maxMinute - _minMinute) / 60.0 * hourHeight;
-    const headerHeight = 44.0;
-    final tableWidth = timeColWidth + dayColWidth * days.length;
+    for (final l in byDay.values) {
+      l.sort((a, b) => a.start.compareTo(b.start));
+    }
 
-    return Material(
-      color: const Color(0xFFF6F7FB),
+    // 时间范围：覆盖最早开始 ~ 最晚结束（取整到小时），最小跨度 4 小时。
+    var minMinute = 6 * 60;
+    var maxMinute = 23 * 60;
+    if (occurrences.isNotEmpty) {
+      var minStart = occurrences.first.start.hour * 60 + occurrences.first.start.minute;
+      var maxEnd = occurrences.first.end.hour * 60 + occurrences.first.end.minute;
+      for (final o in occurrences) {
+        final s = o.start.hour * 60 + o.start.minute;
+        final e = o.end.hour * 60 + o.end.minute;
+        if (s < minStart) minStart = s;
+        if (e > maxEnd) maxEnd = e;
+      }
+      minMinute = minStart ~/ 60 * 60;
+      maxMinute = ((maxEnd + 59) ~/ 60) * 60;
+      if (maxMinute - minMinute < 4 * 60) {
+        maxMinute = minMinute + 4 * 60;
+      }
+      if (minMinute < 0) minMinute = 0;
+      if (maxMinute > 24 * 60) maxMinute = 24 * 60;
+    }
+
+    // 横版海报：宽度按天数横向撑开，高度按内容自适应。
+    final posterWidth =
+        2 * _edgeMargin +
+        2 * _cardPadding +
+        _TimetableGrid.timeColWidth +
+        days.length * _TimetableGrid.dayColWidth;
+
+    return Container(
+      width: posterWidth,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFDCE9FF), Color(0xFFF5F8FF), Color(0xFFEAF3FF)],
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: _edgeMargin,
+        vertical: _topBottomMargin,
+      ),
       child: Container(
-        width: tableWidth + 56,
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(_cardPadding),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(_cardRadius),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7C93C9).withValues(alpha: 0.28),
+              blurRadius: 40,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 顶部渐变标题。
-            Container(
-              width: tableWidth,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4D6BFE), Color(0xFF7C5CFF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            // 1. 顶部主标题 + 副标题。
+            const Text(
+              '我的日程',
+              style: TextStyle(
+                color: _ink,
+                fontSize: 60,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'AI智能规划网课日程',
+              style: TextStyle(
+                color: _subtitleColor,
+                fontSize: 32,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 56),
+            // 2. 课程表（时间 × 星期网格）。
+            _TimetableGrid(
+              days: days,
+              byDay: byDay,
+              minMinute: minMinute,
+              maxMinute: maxMinute,
+            ),
+            // 3. 底部大片留白 + 右下角水印。
+            const SizedBox(height: 110),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Opacity(
+                opacity: 0.6,
+                child: const Text(
+                  '由LinkStudy生成',
+                  style: TextStyle(
+                    color: _watermarkColor,
+                    fontSize: 26,
+                    height: 1.4,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '📅 $rangeLabel',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '共 $total 条日程 · LinkStudy',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.menu_book_outlined,
-                    color: Colors.white70,
-                    size: 28,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 课程表：表头 + 网格。
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE3E6EF)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  // 表头：星期 + 日期。
-                  SizedBox(
-                    height: headerHeight,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: timeColWidth,
-                          color: const Color(0xFFF0F2F8),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '时间',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ),
-                        for (final key in days)
-                          Container(
-                            width: dayColWidth,
-                            color: const Color(0xFFF0F2F8),
-                            alignment: Alignment.center,
-                            child: _DayHeaderLabel(key),
-                          ),
-                      ],
-                    ),
-                  ),
-                  // 网格主体。
-                  SizedBox(
-                    width: tableWidth,
-                    height: gridHeight,
-                    child: Stack(
-                      children: [
-                        // 背景行线 + 时间刻度。
-                        for (var h = _minMinute; h <= _maxMinute; h += 60)
-                          Positioned(
-                            left: 0,
-                            top: (h - _minMinute) / 60.0 * hourHeight,
-                            right: 0,
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: timeColWidth,
-                                  height: hourHeight,
-                                  child: Container(
-                                    alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFFAFBFD),
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: Color(0xFFE8EAF2),
-                                        ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '${(h ~/ 60).toString().padLeft(2, '0')}:00',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF9AA0AE),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                for (var d = 0; d < days.length; d++)
-                                  Container(
-                                    width: dayColWidth,
-                                    height: hourHeight,
-                                    decoration: const BoxDecoration(
-                                      border: Border(
-                                        right: BorderSide(
-                                          color: Color(0xFFEDEFF5),
-                                        ),
-                                        bottom: BorderSide(
-                                          color: Color(0xFFEDEFF5),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        // 课程块（按时间绝对定位）。
-                        for (var d = 0; d < days.length; d++)
-                          for (final o in byDay[days[d]]!)
-                            _posterCourseBlock(
-                              occurrence: o,
-                              color: _colors[d % _colors.length],
-                              left: timeColWidth + d * dayColWidth,
-                              top:
-                                  (o.start.hour * 60 +
-                                      o.start.minute -
-                                      _minMinute) /
-                                  60.0 *
-                                  hourHeight,
-                              height:
-                                  o.end.difference(o.start).inMinutes /
-                                  60.0 *
-                                  hourHeight,
-                              width: dayColWidth,
-                            ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            // 图例。
-            Wrap(
-              spacing: 12,
-              runSpacing: 6,
-              children: [
-                for (var d = 0; d < days.length; d++)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: _colors[d % _colors.length],
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        days[d].substring(5).replaceAll('-', '/'),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
             ),
           ],
         ),
@@ -601,8 +520,189 @@ class _SchedulePoster extends StatelessWidget {
     );
   }
 
-  /// 单条课程块：卡片样式，标题 + 时间，超出裁剪。
-  Widget _posterCourseBlock({
+  static String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static String _hourLabel(int minute) {
+    final h = minute ~/ 60;
+    return '${h.toString().padLeft(2, '0')}:00';
+  }
+
+  static String _hhmmText(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+}
+
+/// 课程表网格：左侧时间刻度 × 顶部星期/日期，课程块按时间绝对定位。
+class _TimetableGrid extends StatelessWidget {
+  const _TimetableGrid({
+    required this.days,
+    required this.byDay,
+    required this.minMinute,
+    required this.maxMinute,
+  });
+
+  final List<DateTime> days;
+  final Map<String, List<GeneralEventOccurrence>> byDay;
+  final int minMinute;
+  final int maxMinute;
+
+  // 网格参数：单格宽高比 1.5:1（300 × 200）。
+  static const timeColWidth = 100.0;
+  static const dayColWidth = 300.0;
+  static const hourHeight = 200.0;
+  static const headerHeight = 96.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final hourCount = (maxMinute - minMinute) ~/ 60;
+    final gridHeight = hourCount * hourHeight;
+    final tableWidth = timeColWidth + days.length * dayColWidth;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // 表头：时间 + 星期/日期。
+          SizedBox(
+            height: headerHeight,
+            child: Row(
+              children: [
+                Container(
+                  width: timeColWidth,
+                  color: const Color(0xFFF0F2F8),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '时间',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+                for (final d in days)
+                  Container(
+                    width: dayColWidth,
+                    color: const Color(0xFFF0F2F8),
+                    alignment: Alignment.center,
+                    // FittedBox 兜底：字体放大时内容整体缩放，不会溢出表头。
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            SchedulePoster._weekdayNames[d.weekday - 1],
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF2A2F3A),
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${d.month}月${d.day}日',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              color: Color(0xFF9AA0AE),
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 网格主体。
+          SizedBox(
+            width: tableWidth,
+            height: gridHeight,
+            child: Stack(
+              children: [
+                // 背景行线 + 时间刻度。
+                for (var h = 0; h < hourCount; h++)
+                  Positioned(
+                    left: 0,
+                    top: h * hourHeight,
+                    right: 0,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: timeColWidth,
+                          height: hourHeight,
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFAFBFD),
+                              border: Border(
+                                bottom: BorderSide(color: Color(0xFFE8EAF2)),
+                              ),
+                            ),
+                            child: Text(
+                              SchedulePoster._hourLabel(minMinute + h * 60),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9AA0AE),
+                              ),
+                            ),
+                          ),
+                        ),
+                        for (var d = 0; d < days.length; d++)
+                          Container(
+                            width: dayColWidth,
+                            height: hourHeight,
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                right: BorderSide(color: Color(0xFFEDEFF5)),
+                                bottom: BorderSide(color: Color(0xFFEDEFF5)),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                // 课程块（按时间绝对定位，颜色与软件内课程一致）。
+                for (var d = 0; d < days.length; d++)
+                  for (final o in byDay[SchedulePoster._dateKey(days[d])] ??
+                      const <GeneralEventOccurrence>[])
+                    _courseBlock(
+                      occurrence: o,
+                      color: effectiveGeneralOccurrenceColor(context, o),
+                      left: timeColWidth + d * dayColWidth,
+                      top:
+                          (o.start.hour * 60 + o.start.minute - minMinute) /
+                          60.0 *
+                          hourHeight,
+                      height:
+                          o.end.difference(o.start).inMinutes / 60.0 * hourHeight,
+                      width: dayColWidth,
+                    ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 单条课程块：与周视图一致的玻璃效果（课程色低透明度填充 +
+  /// 细微加粗的 accent 描边 + accent 文字），格子太矮时只显示标题。
+  Widget _courseBlock({
     required GeneralEventOccurrence occurrence,
     required Color color,
     required double left,
@@ -610,79 +710,91 @@ class _SchedulePoster extends StatelessWidget {
     required double height,
     required double width,
   }) {
+    // 格子高度过小时补足到最小高度。
+    final cellHeight = (height - 6).clamp(40.0, double.infinity);
+    final titleLines = cellHeight >= 96 ? 2 : 1;
+    final fill = _glassFillColor(color);
+    final accent = _glassAccentColor(color, fill);
+    final detail = accent.withValues(alpha: 0.72);
     return Positioned(
-      left: left + 3,
-      top: top + 2,
-      width: width - 6,
-      height: height - 4,
+      left: left + 4,
+      top: top + 3,
+      width: width - 8,
+      height: cellHeight,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(8),
-          border: Border(left: BorderSide(color: color, width: 3)),
+          color: fill,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.50),
+            width: 1.6,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              occurrence.event.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                height: 1.15,
-              ),
+        clipBehavior: Clip.antiAlias,
+        // 内容高度不受格子限制（不触发溢出报错），超出部分按格子裁剪。
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          maxHeight: double.infinity,
+          child: SizedBox(
+            width: width - 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  occurrence.event.title,
+                  maxLines: titleLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${SchedulePoster._hhmmText(occurrence.start)}-'
+                  '${SchedulePoster._hhmmText(occurrence.end)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: detail,
+                    height: 1.2,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              '${_hhmm(occurrence.start)}-${_hhmm(occurrence.end)}',
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF6B7280),
-                height: 1.2,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _DayHeaderLabel extends StatelessWidget {
-  const _DayHeaderLabel(this.dayKey);
+// —— 与周视图课程格一致的“玻璃”配色（海报为浅色底，按亮色处理） ——
 
-  final String dayKey;
+Color _glassFillColor(Color color) =>
+    Color.alphaBlend(color.withValues(alpha: 0.10), Colors.white);
 
-  @override
-  Widget build(BuildContext context) {
-    final date = DateTime.tryParse(dayKey);
-    if (date == null) {
-      return Text(dayKey, style: const TextStyle(fontSize: 13));
-    }
-    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          weekdays[date.weekday - 1],
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF2A2F3A),
-          ),
-        ),
-        Text(
-          '${date.month}/${date.day}',
-          style: const TextStyle(fontSize: 11, color: Color(0xFF9AA0AE)),
-        ),
-      ],
-    );
+Color _glassAccentColor(Color color, Color fill) {
+  var candidate = color.withValues(alpha: 1);
+  if (_contrastRatio(candidate, fill) >= 3.0) {
+    return candidate;
   }
+  for (final alpha in const [0.18, 0.32, 0.46, 0.60]) {
+    candidate = Color.alphaBlend(Colors.black.withValues(alpha: alpha), color);
+    if (_contrastRatio(candidate, fill) >= 3.0) {
+      return candidate;
+    }
+  }
+  return const Color(0xFF4D6BFE);
 }
 
-String _hhmm(DateTime d) =>
-    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+double _contrastRatio(Color a, Color b) {
+  final aLuminance = a.computeLuminance();
+  final bLuminance = b.computeLuminance();
+  final lighter = math.max(aLuminance, bLuminance);
+  final darker = math.min(aLuminance, bLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
